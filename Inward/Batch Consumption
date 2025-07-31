@@ -1,0 +1,101 @@
+if(Type_field == "Batch")
+{
+	info "Inside Batch";
+	BatchNo = input.Batch.Batch_No;
+	quantityReceived = input.Quantity_Received;
+	BomID = input.Batch.Select_BOM;
+	qtyToBeManufactured = ifnull(input.Batch.Quantity_to_be_Manufactured,0);
+	// Get batch info
+	getBatchInfo = Copy_of_Batch[ID == input.Batch];
+	VendorWarehouse = getBatchInfo.Warehouses;
+	getBatchInfo.Quantity_Received=ifnull(getBatchInfo.Quantity_Received,0) + ifnull(quantityReceived,0);
+	// Check if batch is completed
+	if(getBatchInfo.Quantity_to_be_Manufactured == getBatchInfo.Quantity_Received)
+	{
+		getBatchInfo.Batch_Status="Completed";
+	}
+	// Calculate and consume raw materials based on RECEIVED quantity only
+	batchInfo = Copy_of_Batch[ID == input.Batch];
+	for each  rec in batchInfo.List_of_Item
+	{
+		//calculate single item required quantity 
+		totalConsumedQty = ifnull(quantityReceived,0) * ifnull(rec.Required_Stock,0) / qtyToBeManufactured;
+		remainingQtyToConsume = totalConsumedQty;
+		// First try to consume from the specified batch
+		checkInventory = Copy_of_Inventory[IPC == rec.Item_Code && Batch_No == BatchNo && Warehouse_Name == VendorWarehouse];
+		if(checkInventory.count() > 0)
+		{
+			for each  batch in checkInventory
+			{
+				if(remainingQtyToConsume <= 0)
+				{
+					break;
+				}
+				availableInBatch = ifnull(batch.Available_Quantity,0);
+				qtyToDeduct = min(availableInBatch,remainingQtyToConsume);
+				batch.Available_Quantity=availableInBatch - qtyToDeduct;
+				remainingQtyToConsume = remainingQtyToConsume - qtyToDeduct;
+			}
+		}
+		else
+		{
+			info "Raw material inventory not found for item: " + rec.Item_Code + " in specified batch: " + BatchNo;
+		}
+		// If we still have quantity to consume, look for other batches (excluding the original batch)
+		if(remainingQtyToConsume > 0)
+		{
+			info "Still have Qty to consume";
+			otherBatches = Copy_of_Inventory[IPC == rec.Item_Code && Warehouse_Name == VendorWarehouse && Available_Quantity > 0] sort by Added_Time;
+			for each  batch in otherBatches
+			{
+				if(remainingQtyToConsume <= 0)
+				{
+					break;
+				}
+				availableInOtherBatch = ifnull(batch.Available_Quantity,0);
+				qtyToDeduct = min(availableInOtherBatch,remainingQtyToConsume);
+				batch.Available_Quantity=availableInOtherBatch - qtyToDeduct;
+				remainingQtyToConsume = remainingQtyToConsume - qtyToDeduct;
+				info "Consumed " + qtyToDeduct + " from alternate batch: " + batch.Batch_No + " for item: " + rec.Item_Code;
+			}
+			if(remainingQtyToConsume > 0)
+			{
+				info "Insufficient inventory for item: " + rec.Item_Code + ". Still need to consume: " + remainingQtyToConsume;
+			}
+		}
+	}
+	// Update finished goods inventory
+	if(input.Is_IMEI_Disabled)
+	{
+		createInventory = insert into Copy_of_Inventory
+		[
+			IPC=input.Batch.Part_Code
+			Added_User=zoho.loginuser
+			Warehouse_Name=input.Warehouse
+			Status="Inward"
+			Advance_Inventory_Tracking="Track Batches"
+			Batch_No=input.Batch.Batch_No
+			Available_Quantity=input.Quantity_Received
+			Rate=ifnull(getBatchInfo.Select_BOM.Total_Cost,0)
+		];
+	}
+	else
+	{
+		for each  rec in input.IMEI.toList(",")
+		{
+			createInventory = insert into Copy_of_Inventory
+			[
+				IPC=input.Batch.Part_Code
+				Added_User=zoho.loginuser
+				Warehouse_Name=input.Warehouse
+				Status="Inward"
+				Advance_Inventory_Tracking="Track Serial Number"
+				Batch_No=input.Batch.Batch_No
+				IMEI_No=rec
+				Rate=ifnull(getBatchInfo.Select_BOM.Total_Cost,0)
+				Available_Quantity=1
+			];
+		}
+	}
+	openUrl("#Script:page.close","popup window");
+}
