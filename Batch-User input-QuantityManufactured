@@ -1,0 +1,35 @@
+if(Select_BOM != null && input.Quantity_to_be_Manufactured != null)
+{
+	show List_of_Item;
+	bomDetails = Bill_of_Material[ID == input.Select_BOM];
+	input.Production_Item = bomDetails.Manufacturing_Item_Name;
+	x = 0;
+	input.List_of_Item.clear();
+	totalSpecificGravity = 0;
+	totalVolumeSolid = 0;
+	totalSpecificGravityCalculation = 0;
+	totalVolumeSolidCalculation = 0;
+	totalRequiredStock = 0;
+	for each  rec in bomDetails.List_Of_Items
+	{
+		liste = List();
+		itemDetails = Item[ID == rec.Item_Name];
+		fet = Item[ID == rec.Item_Name];
+		rw = Copy_of_Batch.List_of_Item();
+		x = x + 1;
+		rw.Sr_No=x;
+		rw.Item_Code=rec.Item_Name;
+		rw.Required_Stock=rec.Required_Quantity * ifnull(input.Quantity_to_be_Manufactured,1);
+		rw.Manufacturer=rec.Manufacturer;
+		rw.MPN_Master=rec.MPN_Master;
+		rw.Description=rec.Description;
+		rw.Station=rec.Station;
+		rw.Location=rec.Location;
+		rw.Total_Quantity=rec.Required_Quantity * ifnull(input.Quantity_to_be_Manufactured,1);
+		getInv = Copy_of_Inventory[Warehouse_Name == 229942000000604023 && IPC == rw.Item_Code];
+		rw.In_hand_Stock=getInv.sum(Available_Quantity);
+		col = Collection();
+		col.insert(rw);
+		input.List_of_Item.insert(col);
+	}
+}
