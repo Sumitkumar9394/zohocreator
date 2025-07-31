@@ -1,0 +1,26 @@
+if(Select_BOM != null && input.Quantity_to_be_Manufactured != null)
+{
+	bomDetails = Bill_of_Material[ID == input.Select_BOM];
+	show List_of_Item;
+	x = 0;
+	info bomDetails.List_Of_Items;
+	input.List_of_Item.clear();
+	for each  rec in bomDetails.List_Of_Items
+	{
+		itemDetails = Item[ID == rec.Item_Name];
+		rw = Old_Batch.List_of_Item();
+		x = x + 1;
+		rw.Sr_No=x;
+		rw.Item_Code=rec.Item_Name;
+		rw.Required_Stock=rec.Required_Quantity * ifnull(input.Quantity_to_be_Manufactured,1);
+		col = Collection();
+		col.insert(rw);
+		input.List_of_Item.insert(col);
+	}
+	x1 = 0;
+}
+if(Select_BOM == null)
+{
+	input.Quantity_to_be_Manufactured = null;
+	input.List_of_Item.clear();
+}
