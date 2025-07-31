@@ -1,0 +1,65 @@
+//
+shortageInv = list();
+for each  rec in input.Transfer_Details
+{
+	ipc = rec.Item.IPC;
+	if(rec.Item.Advance_Inventory_Tracking != "Track Serial Number")
+	{
+		QtyToAllocate = 0;
+		if(rec.Allocated_Batches == null || rec.Allocated_Batches == "")
+		{
+			shortageInv.add(rec.Item.IPC);
+		}
+		else
+		{
+			for each  batch in rec.Lot_No_Backend.toList()
+			{
+				QtyToAllocate = QtyToAllocate + batch.get("Quantity Allocated");
+			}
+			if(QtyToAllocate != rec.Required_Quantity)
+			{
+				shortageInv.add(rec.Item.IPC);
+			}
+		}
+	}
+}
+if(shortageInv.size() > 0)
+{
+	alert "Inventory is not Available for : " + shortageInv;
+	cancel submit;
+}
+//
+//
+miisingIMEI = list();
+if(input.Select_Transfer_Type == "For Assembly")
+{
+	for each  rec in input.Transfer_Details
+	{
+		ipc = rec.Item.IPC;
+		if(ipc.contains("SFG") && rec.Item.Advance_Inventory_Tracking == "Track Serial Number")
+		{
+			l = input.IMEIs.toList();
+			info l.size();
+			if(l.size() != rec.Transfered_Quantity)
+			{
+				alert "Please Add the IMEI's for selected SFG's";
+				cancel submit;
+			}
+			for each  i in l
+			{
+				inv = Copy_of_Inventory[IMEI_No = i && Warehouse_Name == 229942000000604023 && IPC == rec.Item];
+				if(inv.count() <= 0)
+				{
+					miisingIMEI.add(i);
+					alert "Added IMEI is not Available in Main Warehouse, IMEI : " + i;
+					cancel submit;
+				}
+			}
+		}
+	}
+	if(miisingIMEI.size() > 0)
+	{
+		alert "Added IMEI is not Available in Main Warehouse, IMEI : " + miisingIMEI;
+		cancel submit;
+	}
+}
