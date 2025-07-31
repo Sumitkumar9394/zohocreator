@@ -1,0 +1,57 @@
+if(input.Is_IMEI_Disabled == false)
+{
+	if(Quantity_Received > 1000)
+	{
+		alert "Quantity received should be less than or equal to 1000.";
+		cancel submit;
+	}
+	varReceivedQty = input.Quantity_Received.toNumber();
+	if(input.IMEI.contains(" "))
+	{
+		alert "IMEI contains space. Please remove blankspaces..!";
+		cancel submit;
+	}
+	varIMEIList = input.IMEI.toList(",");
+	varIMEI = varIMEIList.size();
+	if(varReceivedQty != varIMEI)
+	{
+		alert "Received Quantity and IMEI No count not matching. Please check Quantity..!";
+		cancel submit;
+	}
+	if(input.Quantity_Received > input.Batch_Quantity)
+	{
+		alert "Quantity received should be less than or equal to Batch Quantity!";
+		cancel submit;
+	}
+	uniqueIMEISet = list();
+	for each  imei in varIMEIList
+	{
+		if(uniqueIMEISet.contains(imei))
+		{
+			alert "Duplicate IMEI '" + imei + "' found in the current submission. Please check!";
+			cancel submit;
+		}
+		else
+		{
+			uniqueIMEISet.add(imei);
+		}
+	}
+	// Check IMEI type validation
+	requiredType = input.Type_field;
+	// Assuming input.Type represents the required type of IMEI
+	allInward = Inward[IMEI != null && IMEI != "" && Type_field != "Batch"].IMEI.getAll().toList(",");
+	for each  thisrec in varIMEIList
+	{
+		if(thisrec == "" || thisrec.trim() == "")
+		{
+			alert "Invalid IMEI found. Please check!";
+			cancel submit;
+		}
+		if(allInward.contains(thisrec))
+		{
+			// If the Type matches, trigger an info
+			alert "IMEI '" + thisrec + "' of the required type '" + requiredType + "' already exists in the system. Please check!";
+			cancel submit;
+		}
+	}
+}
