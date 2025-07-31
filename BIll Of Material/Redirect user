@@ -1,0 +1,8 @@
+Sum = 0;
+Subform = input.List_Of_Items;
+for each  R in Subform
+{
+	getInv = Inventory[IPC == R.Item_Name && Warehouse_Name.Warehouse_Name == "Main Location"] sort by Inward_Date range from 1 to 1;
+	Sum = Sum + ifnull(getInv.Rate,0) * ifnull(R.Required_Quantity,0);
+}
+input.BOM_Cost = Sum;
