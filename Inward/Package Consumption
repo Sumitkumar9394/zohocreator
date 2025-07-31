@@ -1,0 +1,148 @@
+if(input.Type_field == "Package")
+{
+	// Get package details
+	info "Inside package";
+	getData = Inward[ID == input.ID];
+	if(getData == null)
+	{
+		info "No inward record found with ID: " + input.ID;
+		return;
+	}
+	getPackageDetails = Copy_of_Packaging[ID == getData.Packaging];
+	if(getPackageDetails == null)
+	{
+		info "No package details found for inward record: " + input.ID;
+		return;
+	}
+	// Update Quantity Received
+	getPackageDetails.Quantity_Received=ifnull(getPackageDetails.Quantity_Received,0) + ifnull(getData.Quantity_Received,0);
+	// 	getPackageDetails.Quantity_to_be_Manufactured=getPackageDetails.Quantity_to_be_Manufactured - ifnull(getData.Quantity_Received,0);
+	if(getPackageDetails.Quantity_to_be_Manufactured == getPackageDetails.Quantity_Received)
+	{
+		getPackageDetails.Package_Status="Completed";
+	}
+	AssemblyWarehouse = getPackageDetails.Warehouses;
+	quantityReceived = getData.Quantity_Received;
+	// Process IMEIs for SFG items if provided
+	if(getData.IMEI != null && getData.IMEI != "")
+	{
+		IMEiNoList = getData.IMEI.toList(",");
+		processedIMEIs = List();
+		// First consume SFG items by IMEI
+		Quantity_to_be_Manufactured = getPackageDetails.Quantity_to_be_Manufactured;
+		for each  rec in getPackageDetails.List_Of_Item1
+		{
+			if(rec.Item_Code.Advance_Inventory_Tracking == "Track Serial Number" && rec.Item_Code.Inventory_Account == "SFG")
+			{
+				for each  imei in IMEiNoList
+				{
+					info imei;
+					// Find and consume SFG item with matching IMEI
+					getSFGItem = Copy_of_Inventory[IPC == rec.Item_Code && Warehouse_Name == AssemblyWarehouse && IMEI_No == imei && Available_Quantity > 0];
+					if(getSFGItem == null)
+					{
+						info "SFG item with IMEI " + imei + " not found in Assembly Warehouse";
+						continue;
+					}
+					pkgData = Copy_of_Packaging[ID == getData.Packaging];
+					info "pkgData.Part_Code : " + pkgData.Part_Code;
+					// Consume the SFG item need to update
+					update Copy_of_Inventory[ID == getSFGItem.ID]
+					[
+						IPC=pkgData.Part_Code
+						Warehouse_Name=229942000000604023
+						Inventory_Account="Finished Goods"
+						Inward_Date=zoho.currentdate
+						Package_No=pkgData.Package_No
+						Rate=ifnull(getPackageDetails.Per_AGF_Cost,0)
+						Available_Quantity=1
+					];
+					processedIMEIs.add(imei);
+					info "Consumed SFG item with IMEI: " + imei;
+				}
+				// Remove processed IMEIs
+				for each  processedIMEI in processedIMEIs
+				{
+					index = IMEiNoList.indexOf(processedIMEI);
+					if(index != -1)
+					{
+						IMEiNoList.remove(index);
+					}
+				}
+				if(!IMEiNoList.isEmpty())
+				{
+					info "These IMEIs were not processed: " + IMEiNoList.toString();
+				}
+			}
+			else
+			{
+				info "RM : " + rec.Item_Code.IPC;
+				// Calculate total quantity needed for this item
+				requiredQty = quantityReceived.toDecimal() * ifnull(rec.Required_Stock,0) / ifnull(Quantity_to_be_Manufactured,0);
+				// 				requiredQty = ifnull(rec.Required_Stock,0);
+				info "requiredQty " + requiredQty;
+				remainingQty = requiredQty;
+				// First try to consume primary item
+				primaryBatches = Copy_of_Inventory[IPC == rec.Item_Code && Warehouse_Name == AssemblyWarehouse && Available_Quantity > 0] sort by Inward_Date;
+				for each  batch in primaryBatches
+				{
+					info "Batch No : " + batch.Batch_No;
+					info "remainingQty  : " + remainingQty;
+					if(remainingQty <= 0)
+					{
+						break;
+					}
+					availableQty = ifnull(batch.Available_Quantity,0);
+					info "availableQty  : " + availableQty;
+					deductQty = if(availableQty >= remainingQty,remainingQty,availableQty);
+					info "deductQty  ; " + deductQty;
+					update Copy_of_Inventory[ID == batch.ID]
+					[
+						Available_Quantity=availableQty.toDecimal() - deductQty.toDecimal()
+					];
+					remainingQty = remainingQty.toDecimal() - deductQty.toDecimal();
+					info "remainingQty after Deduct : " + remainingQty;
+					// 					info "Deducted " + deductQty + " from batch " + batch.Batch_No + " (Remaining: " + (availableQty.toDecimal() - deductQty.toDecimal()) + ")";
+				}
+				// If still need more, check alternate items
+				if(remainingQty > 0)
+				{
+					itemInfo = Item[ID == rec.Item_Code.ID];
+					if(itemInfo != null && itemInfo.Alternate_Item != null)
+					{
+						alternateItems = itemInfo.Alternate_Item.toList(",");
+						info "Checking alternate items for " + rec.Item_Code + ": " + alternateItems.toString();
+						for each  altItem in alternateItems
+						{
+							if(remainingQty <= 0)
+							{
+								break;
+							}
+							altBatches = Copy_of_Inventory[IPC == altItem && Warehouse_Name == AssemblyWarehouse && Available_Quantity > 0] sort by Inward_Date;
+							for each  altBatch in altBatches
+							{
+								if(remainingQty <= 0)
+								{
+									break;
+								}
+								altAvailable = ifnull(altBatch.Available_Quantity,0);
+								altDeduct = if(altAvailable >= remainingQty,remainingQty,altAvailable);
+								update Copy_of_Inventory[ID == altBatch.ID]
+								[
+									Available_Quantity=altAvailable.toDecimal() - altDeduct.toDecimal()
+								];
+								remainingQty = remainingQty.toDecimal() - altDeduct.toDecimal();
+								// 								info "Deducted " + altDeduct + " from alternate item " + altItem + " batch " + altBatch.Batch_No + " (Remaining: " + altAvailable - altDeduct + ")";
+							}
+						}
+					}
+				}
+				if(remainingQty > 0)
+				{
+					info "Warning: Could not fulfill full quantity for " + rec.Item_Code + ". Still need: " + remainingQty;
+				}
+			}
+		}
+	}
+	openUrl("#Script:page.close","popup window");
+}
