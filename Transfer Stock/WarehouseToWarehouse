@@ -1,0 +1,62 @@
+// ------------------ For Warehouse to Warehouse Teransfer ------------------
+if(input.Select_Transfer_Type == "Warehouse" || Select_Transfer_Type == "Revision In BOM")
+{
+	// minus from From_Warehouse and insert new record for To_Warehouse
+	for each  rec in input.Transfer_Details
+	{
+		// Get all batches for this item in the source warehouse, sorted by available quantity (FIFO)
+		getBatchData = Copy_of_Inventory[IPC == rec.Item && Warehouse_Name == input.From_Warehouse && Available_Quantity > 0] sort by Inward_Date;
+		info getBatchData;
+		if(getBatchData.count() <= 0)
+		{
+			info "Item not found in source warehouse";
+			continue;
+		}
+		remainingQty = rec.Transfered_Quantity;
+		info "remainingQty : " + remainingQty;
+		// Process each batch until we've transferred the full quantity
+		for each  inv in getBatchData
+		{
+			if(remainingQty <= 0)
+			{
+				break;
+			}
+			// Calculate how much we can take from this batch
+			transferQty = 0;
+			if(inv.Available_Quantity >= remainingQty)
+			{
+				transferQty = remainingQty;
+				remainingQty = 0;
+			}
+			else
+			{
+				transferQty = inv.Available_Quantity;
+				remainingQty = remainingQty - inv.Available_Quantity;
+			}
+			// Update source batch
+			updatedQuantity = inv.Available_Quantity - transferQty;
+			info "updatedQuantity :" + updatedQuantity;
+			update Copy_of_Inventory[ID == inv.ID]
+			[
+				Available_Quantity=updatedQuantity
+			];
+		}
+		// Create new record in destination warehouse
+		transferToVendor = insert into Copy_of_Inventory
+		[
+			IPC=inv.IPC
+			Added_User=zoho.loginuser
+			Batch_No=inv.Batch_No
+			Warehouse_Name=input.To_Warehouse
+			Unit=inv.Unit
+			MPN_Master=inv.MPN_Master
+			Vendor=inv.Vendor
+			Available_Quantity=rec.Transfered_Quantity
+			Rate=inv.Rate
+		];
+		if(remainingQty.toDecimal() > 0)
+		{
+			info "Insufficient quantity available for item: " + rec.Item + ". Could only transfer " + rec.Transfered_Quantity - remainingQty.toDecimal() + " out of " + rec.Transfered_Quantity;
+		}
+	}
+}
