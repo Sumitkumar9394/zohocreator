@@ -1,0 +1,247 @@
+if(Type_field == "Batch")
+{
+	// Get the Inward record for a specific ID
+	BatchNo = input.Batch.Batch_No;
+	if(BatchNo.length() > 50)
+	{
+		ref = BatchNo.left(50);
+	}
+	else
+	{
+		ref = BatchNo;
+	}
+	quantityReceived = input.Quantity_Received;
+	BomID = input.Batch.Select_BOM;
+	qtyToBeManufactured = ifnull(input.Batch.Quantity_to_be_Manufactured,0);
+	getBatch = Copy_of_Batch[ID == input.Batch];
+	info "getBatch : " + getBatch;
+	// Prepare the overall line_items list for the adjustment
+	line_items_list = list();
+	for each  rec in getBatch.List_of_Item
+	{
+		// Calculate total consumed quantity for this item
+		totalConsumedQty = ifnull(quantityReceived,0) * ifnull(rec.Required_Stock,0) / qtyToBeManufactured;
+		itemBooksID = rec.Item_Code.Books_ID;
+		// Only process batch-tracked items
+		if(rec.Item_Code.Books_Inventory_Tracking == "Track Batches")
+		{
+			// Fetch available batches for this item from Zoho Books
+			batches_response = invokeurl
+			[
+				url :"https://www.zohoapis.in/books/v3/items/batches?item_id=" + itemBooksID + "&organization_id=60030703452"
+				type :GET
+				connection:"zoho_oauth_connection"
+			];
+			// Prepare to allocate consumed quantity over batches
+			qty_to_adjust = totalConsumedQty;
+			batch_numbers_list = list();
+			for each  batch in batches_response.get("batches")
+			{
+				if(qty_to_adjust <= 0)
+				{
+					break;
+				}
+				batch_id = batch.get("batch_id");
+				batch_balance = batch.get("balance_quantity");
+				consume_qty = 0;
+				if(batch_balance >= qty_to_adjust)
+				{
+					consume_qty = qty_to_adjust;
+					batch_numbers_list.add({"batch_id":batch_id,"out_quantity":consume_qty.round(2)});
+					qty_to_adjust = 0;
+				}
+				else
+				{
+					consume_qty = batch_balance;
+					batch_numbers_list.add({"batch_id":batch_id,"out_quantity":consume_qty.round(2)});
+					qty_to_adjust = qty_to_adjust - batch_balance;
+				}
+			}
+			// Build line item map for this item
+			line_item_map = Map();
+			line_item_map.put("item_id",itemBooksID);
+			line_item_map.put("batches",batch_numbers_list);
+			line_item_map.put("quantity_adjusted",0 - totalConsumedQty);
+			line_items_list.add(line_item_map);
+		}
+		else if(rec.Item_Code.Books_Inventory_Tracking == "None")
+		{
+			// Build line item map for this item
+			line_item_map = Map();
+			line_item_map.put("item_id",itemBooksID);
+			line_item_map.put("quantity_adjusted",0 - totalConsumedQty);
+			line_items_list.add(line_item_map);
+		}
+	}
+	// For SFG Adj
+	partItemBooksID = input.Batch.Part_Code.Books_ID;
+	partItemTracking = input.Batch.Part_Code.Books_Inventory_Tracking;
+	BatchNo = input.Batch.Batch_No;
+	info BatchNo;
+	info "partItemTracking : " + partItemTracking;
+	receipt_line_items = list();
+	imeiList = input.IMEI.toList(",");
+	if(partItemTracking == "Track Serial Number")
+	{
+		serial_numbers_arr = list();
+		for each  serialNum in imeiList
+		{
+			// Trim spaces if any
+			sn_trimmed = serialNum.trim();
+			if(sn_trimmed != null && sn_trimmed != "")
+			{
+				// 			serial_map = Map();
+				// 			serial_map.put("serial_number",sn_trimmed);
+				serial_numbers_arr.add(sn_trimmed);
+			}
+		}
+		receipt_line_item = Map();
+		receipt_line_item.put("item_id",partItemBooksID);
+		receipt_line_item.put("serial_numbers",serial_numbers_arr);
+		receipt_line_item.put("quantity_adjusted",quantityReceived);
+		line_items_list.add(receipt_line_item);
+	}
+	else if(partItemTracking == "Track Batches")
+	{
+		batch_numbers_list = list();
+		batch_numbers_list.add({"batch_number":BatchNo,"in_quantity":quantityReceived.round(2)});
+		receipt_line_item = Map();
+		receipt_line_item.put("item_id",partItemBooksID);
+		receipt_line_item.put("batches",batch_numbers_list);
+		receipt_line_item.put("quantity_adjusted",quantityReceived);
+		line_items_list.add(receipt_line_item);
+	}
+	else
+	{
+		// For non-batch and non-serial items
+		receipt_line_item = Map();
+		receipt_line_item.put("item_id",partItemBooksID);
+		receipt_line_item.put("quantity_adjusted",quantityReceived);
+		line_items_list.add(receipt_line_item);
+	}
+	// Build the final stock adjustment map
+	adjustment_map = Map();
+	adjustment_map.put("date","2025-04-10");
+	adjustment_map.put("reason","Consumption");
+	adjustment_map.put("reference_number",ref);
+	adjustment_map.put("adjustment_type","quantity");
+	adjustment_map.put("line_items",line_items_list);
+	info "adjustment_map :" + adjustment_map;
+	// REMOVE below comments to actually make the adjustment in Zoho Books:
+	adjustment_response = invokeurl
+	[
+		url :"https://www.zohoapis.in/books/v3/inventoryadjustments?organization_id=60030703452"
+		type :POST
+		parameters:adjustment_map.toString()
+		connection:"zoho_oauth_connection"
+	];
+	// 	info adjustment_response;
+}
+else if(Type_field == "Package")
+{
+	// 
+	info "inside Package";
+	// Get the Inward record for a specific ID
+	quantityReceived = input.Quantity_Received;
+	BomID = input.Packaging.Select_BOM;
+	getPack = Copy_of_Packaging[ID == input.Packaging];
+	if(getPack.Package_No.length() > 50)
+	{
+		ref = getPack.Package_No.left(50);
+	}
+	else
+	{
+		ref = getPack.Package_No;
+	}
+	qtyToBeManufactured = ifnull(getPack.Quantity_to_be_Manufactured,0);
+	info "qtyToBeManufactured : " + qtyToBeManufactured;
+	// Prepare the overall line_items list for the adjustment
+	line_items_list = list();
+	// 	info "getPack : "+getPack ;
+	for each  rec1 in getPack.List_Of_Item1
+	{
+		// Only process batch-tracked items
+		// Calculate total consumed quantity for this item
+		totalConsumedQty = ifnull(quantityReceived,0) * ifnull(rec1.Required_Stock,0) / qtyToBeManufactured;
+		itemBooksID = rec1.Item_Code.Books_ID;
+		// 		info "ID : "+itemBooksID ;
+		// 		info "totalConsumedQty : "+totalConsumedQty ;
+		if(rec1.Item_Code.Books_Inventory_Tracking == "Track Batches")
+		{
+			// Fetch available batches for this item from Zoho Books
+			batches_response = invokeurl
+			[
+				url :"https://www.zohoapis.in/books/v3/items/batches?item_id=" + itemBooksID + "&organization_id=60030703452"
+				type :GET
+				connection:"zoho_oauth_connection"
+			];
+			// Prepare to allocate consumed quantity over batches
+			qty_to_adjust = totalConsumedQty;
+			batch_numbers_list = list();
+			for each  batch in batches_response.get("batches")
+			{
+				if(qty_to_adjust <= 0)
+				{
+					break;
+				}
+				batch_id = batch.get("batch_id");
+				batch_balance = batch.get("balance_quantity");
+				consume_qty = 0;
+				if(batch_balance >= qty_to_adjust)
+				{
+					consume_qty = qty_to_adjust;
+					batch_numbers_list.add({"batch_id":batch_id,"out_quantity":consume_qty.round(2)});
+					qty_to_adjust = 0;
+				}
+				else
+				{
+					consume_qty = batch_balance;
+					batch_numbers_list.add({"batch_id":batch_id,"out_quantity":consume_qty.round(2)});
+					qty_to_adjust = qty_to_adjust - batch_balance;
+				}
+			}
+			// Build line item map for this item
+			line_item_map = Map();
+			line_item_map.put("item_id",itemBooksID);
+			line_item_map.put("batches",batch_numbers_list);
+			line_item_map.put("quantity_adjusted",0 - totalConsumedQty);
+			line_items_list.add(line_item_map);
+		}
+		else if(rec1.Item_Code.Books_Inventory_Tracking == "None")
+		{
+			// Build line item map for this item
+			line_item_map = Map();
+			line_item_map.put("item_id",itemBooksID);
+			line_item_map.put("quantity_adjusted",0 - totalConsumedQty);
+			line_items_list.add(line_item_map);
+		}
+		else if(rec1.Item_Code.Books_Inventory_Tracking == "Track Serial Number")
+		{
+			serial_numbers_arr = input.IMEI.toList();
+			// Build line item map for this item
+			line_item_map = Map();
+			line_item_map.put("item_id",itemBooksID);
+			line_item_map.put("serial_numbers",serial_numbers_arr);
+			line_item_map.put("quantity_adjusted",0 - totalConsumedQty);
+			line_items_list.add(line_item_map);
+		}
+	}
+	// Build the final stock adjustment map
+	adjustment_map = Map();
+	adjustment_map.put("date","2025-04-10");
+	adjustment_map.put("reason","Consumption");
+	adjustment_map.put("reference_number",ref);
+	adjustment_map.put("adjustment_type","quantity");
+	adjustment_map.put("line_items",line_items_list);
+	// 		info adjustment_map;
+	// REMOVE below comments to actually make the adjustment in Zoho Books:
+	adjustment_response = invokeurl
+	[
+		url :"https://www.zohoapis.in/books/v3/inventoryadjustments?organization_id=60030703452"
+		type :POST
+		parameters:adjustment_map.toString()
+		connection:"zoho_oauth_connection"
+	];
+	info adjustment_response;
+}
+//
