@@ -1,0 +1,195 @@
+getRecInfo = Copy_of_Transfer_Stock[ID == input.ID];
+// 	batchNumber = rec.Copy_of_Batch.Batch_No;
+//iterate subform
+if(getRecInfo.Select_Transfer_Type == "For Batch")
+{
+	info "Inside batch";
+	for each  rec in getRecInfo.Transfer_Details
+	{
+		if(rec.Lot_No_Backend != NULL)
+		{
+			info "Found Lot Number " + rec.Lot_No_Backend;
+			for each  batch in rec.Lot_No_Backend.toList()
+			{
+				BatchNo = batch.get("Batch No");
+				getBatchData = Copy_of_Inventory[IPC == rec.Item && Batch_No == BatchNo && Warehouse_Name == 229942000000604023];
+				if(getBatchData == null)
+				{
+					info "Batch not found in Main Location: " + batch.get("Batch No");
+					continue;
+				}
+				// Initialize remaining quantity to allocate
+				remainingQtyToAllocate = batch.get("Quantity Allocated");
+				for each  recBatch in getBatchData
+				{
+					if(remainingQtyToAllocate <= 0)
+					{
+						break;
+					}
+					//     info("IPC : " + recBatch.IPC.IPC);
+					//     info("Batch No = " + batch.get("Batch No"));
+					//     info("Allocated Quantity remaining to process = " + remainingQtyToAllocate);
+					//     info("Available Quantity Before = " + recBatch.Available_Quantity);
+					// Determine how much we can take from this batch
+					qtyToDeduct = min(remainingQtyToAllocate,recBatch.Available_Quantity);
+					if(qtyToDeduct > 0)
+					{
+						// Subtract inventory and SAVE the changes
+						updatedQuantity = recBatch.Available_Quantity - qtyToDeduct;
+						update Copy_of_Inventory[ID == recBatch.ID]
+						[
+							Available_Quantity=updatedQuantity
+						];
+						remainingQtyToAllocate = remainingQtyToAllocate - qtyToDeduct;
+						//         info("Deducted Quantity = " + qtyToDeduct);
+						//         info("Available Quantity After = " + updatedQuantity);
+					}
+				}
+				if(remainingQtyToAllocate > 0)
+				{
+					info "Not enough stock available to fulfill full allocation. Remaining unallocated quantity: " + remainingQtyToAllocate;
+				}
+				// Transfer to vendor location
+				copybatche = Copy_of_Batch[ID = getRecInfo.Batch];
+				transferToVendor = insert into Copy_of_Inventory
+				[
+					IPC=getBatchData.IPC
+					Added_User=zoho.loginuser
+					Batch_No=copybatche.Batch_No
+					Warehouse_Name=getRecInfo.To_Warehouse
+					Unit=getBatchData.IPC
+					MPN_Master=getBatchData.MPN_Master
+					Vendor=getBatchData.Vendor
+					Available_Quantity=batch.get("Quantity Allocated")
+					Rate=getBatchData.Rate
+				];
+			}
+		}
+	}
+	// 	update copy of Batch Status
+	copybatche1 = Copy_of_Batch[ID = getRecInfo.Batch];
+	copybatche1.Batch_Status="Quantity Transferred";
+}
+else if(getRecInfo.Select_Transfer_Type == "For Assembly")
+{
+	info "inside Assembly";
+	if(getRecInfo.IMEIs != "")
+	{
+		//available imeis for SFG transfer
+		IMEiNoList = getRecInfo.IMEIs.toList();
+		processedIMEIs = List();
+		failedIMEIs = List();
+		for each  rec in getRecInfo.Transfer_Details
+		{
+			// 					
+			// Check inventory tracking method for SFG item
+			getItemDetails = Item[ID == rec.Item];
+			// 						info "Inventory Account : " + getItemDetails.Advance_Inventory_Tracking;
+			// Check if the item is SFG (Semi-Finished Goods)
+			if(rec.Item.IPC.contains("SFG") && getItemDetails.Advance_Inventory_Tracking == "Track Serial Number")
+			{
+				info "Track Serial Number";
+				// For serial-tracked SFG items, we need to check IMEI numbers
+				if(IMEiNoList.isEmpty())
+				{
+					info "No IMEI numbers provided for SFG item: " + rec.Item;
+					continue;
+				}
+				// Get all SFG items in main warehouse with matching IPC
+				for each  imei in IMEiNoList
+				{
+					getSFGItem = Copy_of_Inventory[IPC == rec.Item && Warehouse_Name == 229942000000604023 && IMEI_No == imei];
+					info "getSFGItem : " + getSFGItem.IPC.IPC;
+					if(getSFGItem == null)
+					{
+						failedIMEIs.add(imei);
+						info "SFG item " + rec.Item.IPC + " with IMEI " + imei + " not found in Main Location";
+						continue;
+					}
+					// Transfer each matching SFG item to vendor location
+					update Copy_of_Inventory[ID == getSFGItem.ID]
+					[
+						Warehouse_Name=getRecInfo.To_Warehouse
+						Inward_Date=zoho.currentdate
+					];
+					processedIMEIs.add(imei);
+					// 									info "Transferred SFG item with IMEI: " + imei;
+				}
+				// Remove processed IMEIs from the original list
+				for each  processedIMEI in processedIMEIs
+				{
+					index = IMEiNoList.indexOf(processedIMEI);
+					if(index != -1)
+					{
+						IMEiNoList.remove(index);
+					}
+				}
+			}
+			else
+			{
+				if(rec.Lot_No_Backend != NULL)
+				{
+					for each  batch in rec.Lot_No_Backend.toList()
+					{
+						BatchNo = batch.get("Batch No");
+						// Normal item processing (SFG with Batch tracking and RM)
+						getBatchData = Copy_of_Inventory[IPC == rec.Item && Batch_No == BatchNo && Warehouse_Name == 229942000000604023];
+						if(getBatchData == null)
+						{
+							info "Batch not found in Main Location: " + batch.get("Batch No");
+							continue;
+						}
+						// Initialize variables
+						adjustedQuantity = batch.get("Quantity Allocated");
+						remainingQtyToAllocate = adjustedQuantity;
+						// Process each batch record that matches our criteria
+						for each  recBatch in getBatchData
+						{
+							if(remainingQtyToAllocate <= 0)
+							{
+								break;
+							}
+							// Calculate how much we can deduct from this batch
+							qtyToDeduct = min(remainingQtyToAllocate,recBatch.Available_Quantity);
+							if(qtyToDeduct > 0)
+							{
+								// Update the available quantity
+								updatedQuantity = recBatch.Available_Quantity - qtyToDeduct;
+								update Copy_of_Inventory[ID == recBatch.ID]
+								[
+									Available_Quantity=updatedQuantity
+								];
+								remainingQtyToAllocate = remainingQtyToAllocate - qtyToDeduct;
+							}
+						}
+						// Check if we couldn't fulfill the full allocation
+						if(remainingQtyToAllocate > 0)
+						{
+							info "Insufficient stock! Could only allocate " + (adjustedQuantity - remainingQtyToAllocate) + " out of " + adjustedQuantity + " requested for Batch No: " + BatchNo;
+						}
+						// Transfer to vendor location
+						transferToVendor = insert into Copy_of_Inventory
+						[
+							IPC=getBatchData.IPC
+							Added_User=zoho.loginuser
+							Batch_No=BatchNo
+							Warehouse_Name=getRecInfo.To_Warehouse
+							Unit=getBatchData.Unit
+							MPN_Master=getBatchData.MPN_Master
+							Advance_Inventory_Tracking=getBatchData.Advance_Inventory_Tracking
+							Vendor=getBatchData.Vendor
+							Available_Quantity=batch.get("Quantity Allocated")
+							Rate=getBatchData.Rate
+						];
+					}
+				}
+			}
+		}
+		info "Processed IMEis = " + processedIMEIs;
+		// Check if all IMEIs were processed for SFG items
+		if(!failedIMEIs.isEmpty())
+		{
+			info "Warning: Some IMEI numbers were not processed: " + failedIMEIs.toString();
+		}
+	}
+}
