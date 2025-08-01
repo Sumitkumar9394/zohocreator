@@ -1,0 +1,33 @@
+Auto_Populate_Vendor_Data as "Auto Populate Vendor Data"
+{
+	type =  form
+	form = PR
+	record event = on add or edit
+		status = inactive
+
+	on user input of Vendor_Name
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					input.Email2 = input.Vendor_Name.Email;
+				input.Phone_Number = input.Vendor_Name.Phone_Number;
+				input.Bill_To.address_line_1 = input.Vendor_Name.Bill_To.address_line_1;
+				input.Bill_To.address_line_2 = input.Vendor_Name.Bill_To.address_line_2;
+				input.Bill_To.district_city = input.Vendor_Name.Bill_To.district_city;
+				input.Bill_To.country = input.Vendor_Name.Bill_To.country;
+				input.Bill_To.postal_Code = input.Vendor_Name.Bill_To.postal_Code;
+				input.Bill_To.state_province = input.Vendor_Name.Bill_To.state_province;
+				input.Shipping_Address.address_line_1 = input.Vendor_Name.Shipping_Address.address_line_1;
+				input.Shipping_Address.address_line_2 = input.Vendor_Name.Shipping_Address.address_line_2;
+				input.Shipping_Address.district_city = input.Vendor_Name.Shipping_Address.district_city;
+				input.Shipping_Address.country = input.Vendor_Name.Shipping_Address.country;
+				input.Shipping_Address.postal_Code = input.Vendor_Name.Shipping_Address.postal_Code;
+				input.Shipping_Address.state_province = input.Vendor_Name.Shipping_Address.state_province;
+			)
+		}
+	}
+
+}
+
