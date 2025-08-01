@@ -1,0 +1,33 @@
+Fetch_Details_for_Manufac as "Fetch Details for Manufacturer and price"
+{
+	type =  form
+	form = PR
+	record event = on add or edit
+
+	on user input of MRP_Details.MPN_Master1
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					itemdetails = Item[ID = row.IPC];
+				mpndetails = itemdetails.MPN_Subform;
+				// 	info "subform : "+ mpndetails;
+				for each  rec in mpndetails
+				{
+					if(rec.MPN = row.MPN_Master1)
+					{
+						info "Rate " + rec.Rate;
+						info "MNP : " + rec.MPN;
+						row.LPP=rec.Rate;
+						row.Currency=rec.Currency;
+						row.Manufacturer1=rec.Manufacturer;
+						row.Vendor_Name=rec.Vendor_Name;
+					}
+				}
+			)
+		}
+	}
+
+}
+
