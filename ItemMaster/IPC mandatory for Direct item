@@ -1,0 +1,31 @@
+IPC_mandatory_for_Direct_ as "IPC mandatory for Direct item"
+{
+	type =  form
+	form = Item
+	record event = on add or edit
+
+	on validate
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					if(Item_Type == "Direct Item")
+				{
+					if(IPC == "" || IPC == Null)
+					{
+						alert "IPC is Mandatory for Direct Items. Please add IPC and then Submit.";
+						cancel submit;
+					}
+				}
+				// if(Inventory_Account == "AFG" && Product_Name == null)
+				// {
+				// 	alert "Product Name is Mandatory for AFG. Please add and then Submit.";
+				// 	cancel submit;
+				// }
+			)
+		}
+	}
+
+}
+
