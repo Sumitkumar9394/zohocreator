@@ -1,0 +1,26 @@
+Make_Station_and_location as "Make Station and location mandatory"
+{
+	type =  form
+	form = Bill_of_Material
+	record event = on add or edit
+
+	on validate
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					if(Category == "SFG")
+				{
+					if(List_Of_Items.Station == "" || List_Of_Items.Location == "" || List_Of_Items.Station == null || List_Of_Items.Location == null)
+					{
+						alert "Station and Location are mandatory for SFG.!";
+						cancel submit;
+					}
+				}
+			)
+		}
+	}
+
+}
+
