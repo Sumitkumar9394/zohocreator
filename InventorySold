@@ -1,0 +1,55 @@
+Mark_Inventory_as_Sold1 as "Mark Inventory as Sold"
+{
+	type =  form
+	form = Copy_of_Invoiced_Inventory
+	record event = on add or edit
+		status = inactive
+
+	on success
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					info input.IMEI;
+				if(input.IMEI != "" && input.IMEI != null)
+				{
+					info "Not Empty";
+					IMEI_Numbers = input.IMEI.toList();
+					for each  r in IMEI_Numbers
+					{
+						getINV = Inventory[IMEI_No == r];
+						getINV.Invoice_Status="Sold";
+					}
+				}
+				else
+				{
+					qty = input.Quantity;
+					inv = Inventory[IPC == input.Item] sort by Inward_Date;
+					// info inv ;
+					if(inv.contains("No Matching") != true)
+					{
+						for each  rec in inv
+						{
+							if(rec.Available_Quantity >= qty)
+							{
+								rec.Available_Quantity=rec.Available_Quantity - qty;
+								// 			 rec.Invoice_Status = "Sold" ;
+								break;
+							}
+							else
+							{
+								qty = qty - rec.Available_Quantity;
+								rec.Available_Quantity=0;
+								rec.Invoice_Status="Sold";
+								continue;
+							}
+						}
+					}
+				}
+			)
+		}
+	}
+
+}
+
