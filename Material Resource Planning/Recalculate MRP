@@ -1,0 +1,200 @@
+Recaluclate_RM_details_af as "Recaluclate RM details after additional qty"
+{
+	type =  form
+	form = MRP
+	record event = on add or edit
+
+	on user input of Re_Calculate
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					if(input.Re_Calculate == false)
+				{
+					input.RM_Details.clear();
+					hide RM_Details;
+				}
+				else
+				{
+					show RM_Details;
+					// Process FG_Details to fetch raw material details
+					//----------- Add RM for FG_Details line of items from BOM (except SFG) ------------------
+					for each  item in input.FG_Details
+					{
+						if(item.PR_Quantity < 0)
+						{
+							// ---------- Fetch BOM Details for FG -----------
+							bomResponse = Bill_of_Material[Manufacturing_Item_Name == item.IPC];
+							if(bomResponse != null && bomResponse.count() > 0)
+							{
+								for each  bomItem in bomResponse.List_Of_Items
+								{
+									///
+									totalAvailableQty = 0;
+									// Check if BOM item is in inventory; set totalAvailableQty to 0 if not found.
+									rawMaterialInventory = Inventory[IPC == bomItem.Item_Name];
+									if(rawMaterialInventory != null && rawMaterialInventory.count() > 0)
+									{
+										for each  rr in rawMaterialInventory
+										{
+											if(rr.Warehouse_Name == 229942000000604023)
+											{
+												totalAvailableQty = totalAvailableQty + ifnull(rr.Total_Qty.toDecimal(),0);
+											}
+										}
+									}
+									// Add alternate item quantities if available
+									alternateItemsResponse = Item[ID == bomItem.Item_Name];
+									if(alternateItemsResponse != null && alternateItemsResponse.count() > 0)
+									{
+										for each  alternateItem in alternateItemsResponse.Alternate_Item
+										{
+											alternateItemInventory = Inventory[IPC == alternateItem];
+											for each  rr in alternateItemInventory
+											{
+												if(rr.Warehouse_Name == 229942000000604023)
+												{
+													totalAvailableQty = totalAvailableQty + rr.Total_Qty.toDecimal();
+												}
+											}
+										}
+									}
+									requiredRawMaterialQty = bomItem.Required_Quantity * item.PR_Quantity.abs();
+									//
+									//
+									// ------------- In- Transit Materails ---------
+									intrasitList = list();
+									intrasitQty = 0;
+									for each  intr in In_Transit[Status == "Open"]
+									{
+										for each  inItem in intr.Item_Details
+										{
+											if(inItem.Item == bomItem.Item_Name)
+											{
+												info "Found";
+												intrasitList.add(intr);
+												intrasitQty = intrasitQty + inItem.Quantity;
+											}
+										}
+									}
+									//
+									///
+									//
+									// Get the inventory account type from the Item table
+									itemDetails = Item[ID == bomItem.Item_Name];
+									// 				 ----------- Check bomitem is SFG or RM (Add SFG into SFG_Details subform )-------
+									if(itemDetails != null && itemDetails.Inventory_Account != "SFG")
+									{
+										info "Else.....";
+										itemExists = false;
+										for each  rc in input.RM_Details
+										{
+											if(rc.IPC == bomItem.Item_Name)
+											{
+												itemExists = true;
+											}
+										}
+										if(itemExists = true)
+										{
+											for each  rc in input.RM_Details
+											{
+												info "rc.IPC " + rc.IPC + "  bomItem.Item_Name " + bomItem.Item_Name;
+												if(rc.IPC == bomItem.Item_Name)
+												{
+													rc.Required_Quantity=rc.Required_Quantity + requiredRawMaterialQty;
+													prQty = rc.Available_Quantity - rc.Required_Quantity;
+													if(prQty < 0)
+													{
+														rc.PR_Quantity=prQty;
+													}
+													else
+													{
+														rc.PR_Quantity=0;
+													}
+													//
+													rq1 = rc.PR_Quantity.toString().remove("-");
+													prpu = intrasitQty - rq1.toNumber();
+													info prpu;
+													info "prpu : " + prpu.round(0);
+													if(prpu < 0)
+													{
+														info "If ......";
+														rc.Shortages_for_Purchase=prpu.round(0);
+													}
+													else
+													{
+														info "Else.....";
+														rc.Shortages_for_Purchase=0;
+													}
+													//
+													itemExists = true;
+													break;
+												}
+											}
+										}
+										else
+										{
+											info "New Item AFG RM";
+											// ---------- Add RM into RM_Details subform ------
+											//
+											row2 = MRP.RM_Details();
+											row2.IPC=bomItem.Item_Name;
+											row2.Available_Quantity=totalAvailableQty;
+											row2.Required_Quantity=requiredRawMaterialQty;
+											row2.In_Transit=intrasitList;
+											row2.In_Transit_Quantity=intrasitQty;
+											row2.Description=bomItem.Description;
+											row2.MPN_Master=bomItem.MPN_Master;
+											row2.Manufacturer1=bomItem.Manufacturer;
+											prQ = totalAvailableQty - requiredRawMaterialQty;
+											if(prQ < 0)
+											{
+												row2.PR_Quantity=prQ;
+											}
+											else
+											{
+												row2.PR_Quantity=0;
+											}
+											//
+											rq = row2.PR_Quantity.toString().remove("-");
+											prp = intrasitQty - rq.toNumber();
+											// 						info prp;
+											info "intrasitQty : " + intrasitQty + "  row2.PR_Quantity : " + row2.PR_Quantity.remove("-");
+											info "prp : " + prp.round(0);
+											if(prp < 0)
+											{
+												info "IF....";
+												row2.Shortages_for_Purchase=prp.round(0);
+											}
+											else
+											{
+												info "else....";
+												row2.Shortages_for_Purchase=0;
+											}
+											//
+											input.RM_Details.insert(row2);
+										}
+									}
+								}
+							}
+						}
+					}
+					//
+					// -------- Sr No for all the subforms -----------
+					sr = 0;
+					ls = List();
+					for each  reccc in input.RM_Details
+					{
+						sr = sr + 1;
+						reccc.Sr_No=sr;
+						ls.add(reccc.Sr_No);
+						input.RM_Details.insert(ls);
+					}
+				}
+			)
+		}
+	}
+
+}
+
