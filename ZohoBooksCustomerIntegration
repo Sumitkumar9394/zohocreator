@@ -1,0 +1,249 @@
+Create_Update_Customer_in as "Create/Update Customer in Books"
+{
+	type =  form
+	form = Customer
+	record event = on add or edit
+
+	on success
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					mpC = Map();
+				mpOptional = Map();
+				CPlist = List();
+				mpCP = Map();
+				mpCP.put("email",input.Email);
+				mpCP.put("phone",input.Phone_Number.right(10));
+				mpCP.put("mobile",input.Mobile.right(10));
+				CPlist.add(mpCP);
+				mpC.put("contact_persons",CPlist);
+				mpC.put("contact_type","customer");
+				mpC.put("company_name",input.Company_Name);
+				mpC.put("contact_name",input.Customer_Name);
+				mpC.put("payment_terms_label",input.Payment_Terms);
+				//===================================================
+				// Set your search parameter (currency code) in the parameters_data
+				parameters_data = Map();
+				currencyResponse = invokeurl
+				[
+					url :"https://www.zohoapis.in/books/v3/settings/currencies?organization_id=60030703452"
+					type :GET
+					parameters:parameters_data
+					connection:"booksconn"
+				];
+				currencyList = currencyResponse.get("currencies");
+				filteredCurrency = null;
+				// Iterate over the list of currencies to find the one with the desired currency code
+				for each  currency in currencyList
+				{
+					if(currency.get("currency_code") == input.Currency)
+					{
+						filteredCurrency = currency;
+						currencyID = currency.get("currency_id");
+						break;
+					}
+				}
+				mpC.put("currency_id",currencyID);
+				//source of supply==========================================
+				if(input.Place_Of_Supply == "[AP] - Andhra Pradesh")
+				{
+					mpC.put("place_of_contact","AP");
+				}
+				else if(input.Place_Of_Supply == "[AR] - Arunachal Pradesh")
+				{
+					mpC.put("place_of_contact","AR");
+				}
+				else if(input.Place_Of_Supply == "[AS] - Assam")
+				{
+					mpC.put("place_of_contact","AS");
+				}
+				else if(input.Place_Of_Supply == "[BR] - Bihar")
+				{
+					mpC.put("place_of_contact","BR");
+				}
+				else if(input.Place_Of_Supply == "[CT] - Chhattisgarh")
+				{
+					mpC.put("place_of_contact","CT");
+				}
+				else if(input.Place_Of_Supply == "[GA] - Goa")
+				{
+					mpC.put("place_of_contact","GA");
+				}
+				else if(input.Place_Of_Supply == "[GJ] - Gujarat")
+				{
+					mpC.put("place_of_contact","GJ");
+				}
+				else if(input.Place_Of_Supply == "[HR] - Haryana")
+				{
+					mpC.put("place_of_contact","HR");
+				}
+				else if(input.Place_Of_Supply == "[HP] - Himachal Pradesh")
+				{
+					mpC.put("place_of_contact","HP");
+				}
+				else if(input.Place_Of_Supply == "[JK] - Jammu and Kashmir")
+				{
+					mpC.put("place_of_contact","JK");
+				}
+				else if(input.Place_Of_Supply == "[JH] - Jharkhand")
+				{
+					mpC.put("place_of_contact","JH");
+				}
+				else if(input.Place_Of_Supply == "[KA] - Karnataka")
+				{
+					mpC.put("place_of_contact","KA");
+				}
+				else if(input.Place_Of_Supply == "[KL] - Kerala")
+				{
+					mpC.put("place_of_contact","KL");
+				}
+				else if(input.Place_Of_Supply == "[MP] - Madhya Pradesh")
+				{
+					mpC.put("place_of_contact","MP");
+				}
+				else if(input.Place_Of_Supply == "[MH] - Maharashtra")
+				{
+					mpC.put("place_of_contact","MH");
+				}
+				else if(input.Place_Of_Supply == "[MN] - Manipur")
+				{
+					mpC.put("place_of_contact","MN");
+				}
+				else if(input.Place_Of_Supply == "[ML] - Meghalaya")
+				{
+					mpC.put("place_of_contact","ML");
+				}
+				else if(input.Place_Of_Supply == "[MZ] - Mizoram")
+				{
+					mpC.put("place_of_contact","MZ");
+				}
+				else if(input.Place_Of_Supply == "[NL] - Nagaland")
+				{
+					mpC.put("place_of_contact","NL");
+				}
+				else if(input.Place_Of_Supply == "[OR] - Odisha")
+				{
+					mpC.put("place_of_contact","OR");
+				}
+				else if(input.Place_Of_Supply == "[PB] - Punjab")
+				{
+					mpC.put("place_of_contact","PB");
+				}
+				else if(input.Place_Of_Supply == "[RJ] - Rajasthan")
+				{
+					mpC.put("place_of_contact","RJ");
+				}
+				else if(input.Place_Of_Supply == "[SK] - Sikkim")
+				{
+					mpC.put("place_of_contact","SK");
+				}
+				else if(input.Place_Of_Supply == "[TN] - Tamil Nadu")
+				{
+					mpC.put("place_of_contact","TN");
+				}
+				else if(input.Place_Of_Supply == "[TG] - Telangana")
+				{
+					mpC.put("place_of_contact","TG");
+				}
+				else if(input.Place_Of_Supply == "[TR] - Tripura")
+				{
+					mpC.put("place_of_contact","TR");
+				}
+				else if(input.Place_Of_Supply == "[UP] - Uttar Pradesh")
+				{
+					mpC.put("place_of_contact","UP");
+				}
+				else if(input.Place_Of_Supply == "[UT] - Uttarakhand")
+				{
+					mpC.put("place_of_contact","UT");
+				}
+				else if(input.Place_Of_Supply == "[WB] - West Bengal")
+				{
+					mpC.put("place_of_contact","WB");
+				}
+				else if(input.Place_Of_Supply == "[AN] - Andaman and Nicobar Islands")
+				{
+					mpC.put("place_of_contact","AN");
+				}
+				else if(input.Place_Of_Supply == "[CH] - Chandigarh")
+				{
+					mpC.put("place_of_contact","CH");
+				}
+				else if(input.Place_Of_Supply == "[DN] - Dadra and Nagar Haveli")
+				{
+					mpC.put("place_of_contact","DN");
+				}
+				else if(input.Place_Of_Supply == "[DD] - Daman and Diu")
+				{
+					mpC.put("place_of_contact","DD");
+				}
+				else if(input.Place_Of_Supply == "[LD] - Lakshadweep")
+				{
+					mpC.put("place_of_contact","LD");
+				}
+				else if(input.Place_Of_Supply == "[DL] - Delhi")
+				{
+					mpC.put("place_of_contact","DL");
+				}
+				else if(input.Place_Of_Supply == "[PY] - Puducherry")
+				{
+					mpC.put("place_of_contact","PY");
+				}
+				//===========================================================
+				if(input.GST_Treatment == "Business - Regular")
+				{
+					mpC.put("gst_treatment","business_gst");
+				}
+				else if(input.GST_Treatment == "Business - Unregistered")
+				{
+					mpC.put("gst_treatment","business_none");
+				}
+				else if(input.GST_Treatment == "Overseas")
+				{
+					mpC.put("gst_treatment","overseas");
+				}
+				else if(input.GST_Treatment == "Business - Composition")
+				{
+					mpC.put("gst_treatment","business_registered_composition");
+				}
+				mpC.put("gst_no",input.GSTIN_UIN);
+				mpC.put("pan_no",input.PAN);
+				mpC.put("notes",input.Notes);
+				mp2 = Map();
+				mp2.put("country",input.Billing_Address.country);
+				mp2.put("city",input.Billing_Address.district_city);
+				mp2.put("address",input.Billing_Address.address_line_1);
+				mp2.put("street2",input.Billing_Address.address_line_2);
+				mp2.put("state",input.Billing_Address.state_province);
+				mp2.put("zip",input.Billing_Address.postal_Code);
+				mpC.put("billing_address",mp2);
+				mp3 = Map();
+				mp3.put("country",input.Shipping_Address.country);
+				mp3.put("city",input.Shipping_Address.district_city);
+				mp3.put("address",input.Shipping_Address.address_line_1);
+				mp3.put("street2",input.Shipping_Address.address_line_2);
+				mp3.put("state",input.Shipping_Address.state_province);
+				mp3.put("zip",input.Shipping_Address.postal_Code);
+				mpC.put("shipping_address",mp3);
+				// 	info "mpC : " + mpC;
+				if(input.Books_ID != "")
+				{
+					// mpC.put("Vendor_Group",ConData.get("custom_field_hash").get("cf_vendor_group"));
+					updateRec = zoho.books.updateRecord("contacts","60030703452",input.Books_ID,mpC,"booksconn");
+					// 	info "updateRec : " + updateRec;
+				}
+				else
+				{
+					createRec = zoho.books.createRecord("contacts","60030703452",mpC,"booksconn");
+					info "createRec : " + createRec;
+					input.Books_ID = createRec.get("contact").get("contact_id");
+					info input.Books_ID;
+				}
+			)
+		}
+	}
+
+}
+
