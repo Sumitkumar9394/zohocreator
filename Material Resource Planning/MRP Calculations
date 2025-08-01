@@ -1,0 +1,317 @@
+New_MRP_Calculation as "New MRP Calculation"
+{
+	type =  form
+	form = MRP
+	record event = on add
+		status = inactive
+
+	on load
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// Disable specific fields in FG_Details and RM_Details
+				disable FG_Details.PR_Quantity;
+				disable FG_Details.Available_Quantity;
+				disable FG_Details.Required_Quantity;
+				disable RM_Details.PR_Quantity;
+				disable RM_Details.Available_Quantity;
+				disable RM_Details.Required_Quantity;
+				hide FG_Details.Shortages_for_Purchase;
+				input.Date_field = null;
+				// -------------- FG Details Subform Functionality --------
+				if(input.Forecast_No != null)
+				{
+					input.Date_field = zoho.currentdate;
+					for each  FNO in input.Forecast_No
+					{
+						availableQty = 0;
+						forecastResponse = Forecast[ID == FNO];
+						for each  itemDetail in forecastResponse.Forecast_Details
+						{
+							itemData = Item[Product_Name == itemDetail.Product_Name];
+							// 			info "itemData "+itemData;
+							for each  it in itemData
+							{
+								// Get active BOM Details
+								bomCheck = Bill_of_Material[Manufacturing_Item_Name == it.ID && Status == "Active"];
+								info "bomCheck " + bomCheck;
+								if(bomCheck == null || bomCheck.count() == 0)
+								{
+									continue;
+								}
+								// Inventory Details
+								inventoryResponse = Inventory[IPC == it];
+								info "inventoryResponse " + inventoryResponse;
+								availableQty = 0;
+								for each  inv in inventoryResponse
+								{
+									// if inventory avialable in main warehouse add availableQty
+									if(inv.Warehouse_Name == 229942000000604023)
+									{
+										availableQty = availableQty + inv.Total_Qty.toDecimal();
+									}
+								}
+								itemExists = false;
+								for each  row in input.FG_Details
+								{
+									// Get Manufcaturerdata
+									Manufacturerdata = Manufacturer[ID == inventoryResponse.IPC.Vendor];
+									if(row.IPC == it.ID)
+									{
+										row.Available_Quantity=availableQty;
+										row.Required_Quantity=row.Required_Quantity + itemDetail.Quantity;
+										if(row.Available_Quantity - row.Required_Quantity > 0)
+										{
+											row.PR_Quantity=0;
+										}
+										else
+										{
+											row.PR_Quantity=row.Available_Quantity - row.Required_Quantity;
+										}
+										itemExists = true;
+										break;
+									}
+								}
+								if(!itemExists)
+								{
+									requiredFGQty = ifnull(availableQty,0) - ifnull(itemDetail.Quantity,0);
+									row1 = MRP.FG_Details();
+									row1.IPC=it.ID;
+									row1.Available_Quantity=availableQty;
+									row1.Required_Quantity=itemDetail.Quantity;
+									if(requiredFGQty > 0)
+									{
+										row1.PR_Quantity=0;
+									}
+									else
+									{
+										row1.PR_Quantity=requiredFGQty;
+									}
+									row1.Description=it.Description;
+									input.FG_Details.insert(row1);
+								}
+							}
+						}
+					}
+				}
+				// Process FG_Details to fetch raw material details
+				//----------- Add RM for FG_Details line of items from BOM (except SFG) ------------------
+				for each  item in input.FG_Details
+				{
+					if(item.PR_Quantity < 0)
+					{
+						// ---------- Fetch BOM Details for FG -----------
+						bomResponse = Bill_of_Material[Manufacturing_Item_Name == item.IPC];
+						if(bomResponse != null && bomResponse.count() > 0)
+						{
+							for each  bomItem in bomResponse.List_Of_Items
+							{
+								totalAvailableQty = 0;
+								// Check if BOM item is in inventory; set totalAvailableQty to 0 if not found.
+								rawMaterialInventory = Inventory[IPC == bomItem.Item_Name];
+								if(rawMaterialInventory != null && rawMaterialInventory.count() > 0)
+								{
+									for each  rr in rawMaterialInventory
+									{
+										if(rr.Warehouse_Name == 229942000000604023)
+										{
+											totalAvailableQty = totalAvailableQty + ifnull(rr.Total_Qty.toDecimal(),0);
+										}
+									}
+								}
+								// Add alternate item quantities if available
+								alternateItemsResponse = Item[ID == bomItem.Item_Name];
+								if(alternateItemsResponse != null && alternateItemsResponse.count() > 0)
+								{
+									for each  alternateItem in alternateItemsResponse.Alternate_Item
+									{
+										alternateItemInventory = Inventory[IPC == alternateItem];
+										for each  rr in alternateItemInventory
+										{
+											if(rr.Warehouse_Name == 229942000000604023)
+											{
+												totalAvailableQty = totalAvailableQty + rr.Total_Qty.toDecimal();
+											}
+										}
+									}
+								}
+								requiredRawMaterialQty = bomItem.Required_Quantity * item.PR_Quantity.abs();
+								// Get the inventory account type from the Item table
+								itemDetails = Item[ID == bomItem.Item_Name];
+								// 				 ----------- Check bomitem is SFG or RM (Add SFG into SFG_Details subform )-------
+								if(itemDetails != null && itemDetails.Inventory_Account == "SFG")
+								{
+									// ----------- Add SFG into SFG_Details subform -----------
+									sfgRow = MRP.SFG_Details();
+									sfgRow.IPC=bomItem.Item_Name;
+									sfgRow.Total_Stock=totalAvailableQty;
+									sfgRow.Total_Requirement=requiredRawMaterialQty;
+									sfgRow.Description=bomItem.Description;
+									sfgRow.MPN_Master=bomItem.MPN_Master;
+									sfgRow.Manufacturer=bomItem.Manufacturer;
+									prQ = totalAvailableQty - requiredRawMaterialQty;
+									if(prQ < 0)
+									{
+										sfgRow.Shortages=prQ;
+										sfgRow.Shortages_for_Purchase=prQ;
+									}
+									else
+									{
+										sfgRow.Shortages=0;
+										sfgRow.Shortages_for_Purchase=0;
+									}
+									input.SFG_Details.insert(sfgRow);
+								}
+								else
+								{
+									itemExists = false;
+									for each  rc in input.RM_Details
+									{
+										if(rc.IPC == bomItem.Item_Name)
+										{
+											rc.Required_Quantity=rc.Required_Quantity + requiredRawMaterialQty;
+											prQty = totalAvailableQty - rc.Required_Quantity;
+											if(prQty < 0)
+											{
+												rc.PR_Quantity=prQty;
+												rc.Shortages_for_Purchase=prQty;
+											}
+											else
+											{
+												rc.PR_Quantity=0;
+												rc.Shortages_for_Purchase=0;
+											}
+											itemExists = true;
+											break;
+										}
+									}
+									if(!itemExists)
+									{
+										// ---------- Add RM into RM_Details subform ------
+										//
+										row2 = MRP.RM_Details();
+										row2.IPC=bomItem.Item_Name;
+										row2.Available_Quantity=totalAvailableQty;
+										row2.Required_Quantity=requiredRawMaterialQty;
+										row2.Description=bomItem.Description;
+										row2.MPN_Master=bomItem.MPN_Master;
+										row2.Manufacturer1=bomItem.Manufacturer;
+										prQ = totalAvailableQty - requiredRawMaterialQty;
+										if(prQ < 0)
+										{
+											row2.PR_Quantity=prQ;
+											row2.Shortages_for_Purchase=prQ;
+										}
+										else
+										{
+											row2.PR_Quantity=0;
+											row2.Shortages_for_Purchase=0;
+										}
+										input.RM_Details.insert(row2);
+									}
+								}
+							}
+						}
+					}
+				}
+				//
+				// ------------- Add SFG RM bu fetching BOM for SFG and add into SFG_Details --------
+				// Processing for SFG_Details items, adding into SFG_RM_Details
+				for each  sfgrec in input.SFG_Details
+				{
+					bomResponse = Bill_of_Material[Manufacturing_Item_Name == sfgrec.IPC && Status == "Active"];
+					if(bomResponse != null && bomResponse.count() > 0)
+					{
+						for each  bomItem in bomResponse.List_Of_Items
+						{
+							totalAvailableQty = 0;
+							rawMaterialInventory = Inventory[IPC == bomItem.Item_Name];
+							if(rawMaterialInventory != null && rawMaterialInventory.count() > 0)
+							{
+								for each  rr in rawMaterialInventory
+								{
+									if(rr.Warehouse_Name == 229942000000604023)
+									{
+										totalAvailableQty = totalAvailableQty + ifnull(rr.Total_Qty.toDecimal(),0);
+									}
+								}
+							}
+							alternateItemsResponse = Item[ID == rawMaterialInventory.IPC];
+							if(alternateItemsResponse != null && alternateItemsResponse.count() > 0)
+							{
+								for each  alternateItem in alternateItemsResponse.Alternate_Item
+								{
+									alternateItemInventory = Inventory[IPC == alternateItem];
+									for each  rr in alternateItemInventory
+									{
+										if(rr.Warehouse_Name == 229942000000604023)
+										{
+											totalAvailableQty = totalAvailableQty + rr.Total_Qty.toDecimal();
+										}
+									}
+								}
+							}
+							requiredRawMaterialQty = bomItem.Required_Quantity * sfgrec.Shortages_for_Purchase.abs();
+							sfgRMRow = MRP.SFG_RM_Details();
+							sfgRMRow.IPC=bomItem.Item_Name;
+							sfgRMRow.Total_Stock=totalAvailableQty;
+							sfgRMRow.Total_Requirement=requiredRawMaterialQty;
+							sfgRMRow.Description=bomItem.Description;
+							sfgRMRow.MPN_Master=bomItem.MPN_Master;
+							sfgRMRow.Manufacturer=bomItem.Manufacturer;
+							prQ = totalAvailableQty - requiredRawMaterialQty;
+							if(prQ < 0)
+							{
+								sfgRMRow.Shortages=prQ;
+								sfgRMRow.Shortages_for_Purchase=prQ;
+							}
+							else
+							{
+								sfgRMRow.Shortages=0;
+								sfgRMRow.Shortages_for_Purchase=0;
+							}
+							input.SFG_RM_Details.insert(sfgRMRow);
+						}
+					}
+				}
+				// Handle In Transit data
+				//intransit code removed look for version
+				// -------- Sr No for all the subforms -----------
+				sr1 = 0;
+				ls1 = List();
+				for each  recc in input.FG_Details
+				{
+					sr1 = sr1 + 1;
+					recc.Sr_No=sr1;
+					ls1.add(recc.Sr_No);
+					input.FG_Details.insert(ls1);
+				}
+				sr = 0;
+				ls = List();
+				for each  reccc in input.RM_Details
+				{
+					sr = sr + 1;
+					reccc.Sr_No=sr;
+					ls.add(reccc.Sr_No);
+					input.RM_Details.insert(ls);
+				}
+				s = 0;
+				for each  el in input.SFG_Details
+				{
+					s = s + 1;
+					el.Sr_No=s;
+				}
+				srm = 0;
+				for each  ell in input.SFG_RM_Details
+				{
+					srm = srm + 1;
+					ell.Sr_No=srm;
+				}
+			)
+		}
+	}
+
+}
+
