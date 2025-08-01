@@ -1,0 +1,35 @@
+Send_mail_to_vendor as "Send mail to vendor"
+{
+	type =  form
+	form = Add_New_Vendor_For_Registration
+	record event = on add
+
+	on success
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					if(zoho.loginuserid == "atish.bhalerao@intangles.com")
+				{
+					ccmail = "smita.patil@intangles.com";
+				}
+				if(zoho.loginuserid == "smita.patil@intangles.com")
+				{
+					ccmail = "atish.bhalerao@intangles.com";
+				}
+				mess = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Vendor Registration</title><style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333333;max-width:600px;margin:0 auto;padding:0}.header{background-color:#f8f8f8;padding:30px 20px;text-align:center;border-radius:5px 5px 0 0}.logo{max-height:80px;max-width:100%}.content{padding:25px;background-color:#ffffff;border-left:1px solid #eeeeee;border-right:1px solid #eeeeee}.footer{background-color:#f8f8f8;padding:20px;text-align:center;font-size:12px;color:#777777;border-radius:0 0 5px 5px}.button{display:inline-block;padding:12px 24px;background-color:#4CAF50;text-decoration:none;border-radius:4px;font-weight:bold;margin:20px 0}.button:hover{background-color:#45a049}.divider{border-top:1px solid #eeeeee;margin:20px 0}</style></head><body><div class='header'><img src='https://www.intangles.ai/wp-content/uploads/2025/01/Intangles%C2%AE-Logo-Grey-H_india-300x97.png' alt='Intangles Logo' class='logo'></div><div style='text-align: center'><h1 style='margin-top:20px'>Welcome to Intangles!</h1></div><div class='content'><p>Dear Vendor,</p><p>Thank you for your interest in partnering with <strong>Intangles Lab Pvt Ltd</strong>. We're excited to have you join our Company.</p><div class='divider'></div><h3 style='margin-top:0'>Next Steps:</h3><p>To complete your registration, please click the button below to access our vendor registration form:</p><p style='text-align:center'><a href='https://creatorapp.zohopublic.in/intangles/manufacturing-management/form-perma/Vendor_Registration/pSAGRq9fQQnWrBN3gjj3vJkkDqZGy4n2VMFFh8OkqSu2fgEGBXKFPHYYpyWAXAuy4eYfn1Zz4Xe2A9pDgEvK9pZr7g7DM6WR8Vn3?Email=" + input.Email + "' class='button' style = 'color: white;'>Complete Vendor Registration</a></p><p>The registration process should take approximately 10-15 minutes to complete. You'll need to provide:</p><ul><li>Your company information</li><li>Primary contact details</li><li>Business documentation (PAN, Certifications, etc.)</li><li>Payment/banking information</li><li>Product/service details</li></ul><p><strong>Important:</strong> Once you submit the form, it cannot be edited for security reasons.</p><div class='divider'></div><p>We look forward to building a successful partnership with you!</p><p>Best regards,<br><strong>" + zoho.loginuser + "</strong><br>Vendor Relations Manager<br><strong>Intangles</strong></p></div></body></html>";
+				sendmail
+				[
+					from :zoho.loginuserid
+					to :input.Email
+					cc:ifnull(ccmail,"") + ",atish.bhalerao@intangles.com"
+					subject :"Intangles - Vendor Registration"
+					message :mess
+				]
+			)
+		}
+	}
+
+}
+
