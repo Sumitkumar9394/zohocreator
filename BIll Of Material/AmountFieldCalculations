@@ -1,0 +1,27 @@
+Calculate_Amount_Field as "Calculate Amount Field"
+{
+	type =  form
+	form = Bill_of_Material
+	record event = on add or edit
+
+	on user input of List_Of_Items.Required_Quantity
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					getInv = Inventory[IPC == row.Item_Name && Warehouse_Name.Warehouse_Name == "Main Location"] sort by Inward_Date range from 1 to 1;
+				t = ifnull(row.Required_Quantity,0) * ifnull(getInv.Rate,0);
+				row.Amount=t.round(4);
+				Sum = 0;
+				for each  r in input.List_Of_Items
+				{
+					Sum = Sum + ifnull(r.Amount,0);
+				}
+				input.BOM_Cost = Sum.round(4);
+			)
+		}
+	}
+
+}
+
