@@ -1,0 +1,30 @@
+Calculate_Shortage as "Calculate_Shortage"
+{
+	type =  form
+	form = MRP
+	record event = on add or edit
+
+	on user input of FG_Details.Required_Quantity
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// row.PR_Quantity=ifnull(row.Available_Quantity,0) - (ifnull(row.Required_Quantity,0) + ifnull(row.Additional_Quantity,0));
+				// row.Shortages_for_Purchase=ifnull(row.Available_Quantity,0) - (ifnull(row.Required_Quantity,0) + ifnull(row.Additional_Quantity,0));
+				if(ifnull(row.Available_Quantity,0) - ifnull(row.Required_Quantity,0) > 0)
+				{
+					row.PR_Quantity=0;
+					row.Shortages_for_Purchase=0;
+				}
+				else
+				{
+					row.PR_Quantity=row.Available_Quantity - row.Required_Quantity;
+					row.Shortages_for_Purchase=row.Available_Quantity - row.Required_Quantity;
+				}
+			)
+		}
+	}
+
+}
+
