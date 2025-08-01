@@ -1,0 +1,59 @@
+Hide_Show_Fields12 as "Hide/Show Fields"
+{
+	type =  form
+	form = Copy_of_Batch
+	record event = on add or edit
+
+	on user input of Batch_Status
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					if(input.Batch_Status == "Completed")
+				{
+					show Actual_Produce_Qty_Yield;
+					show List_of_Item;
+					disable List_of_Item.Item_Code;
+					show List_of_Batch_Details;
+					lis = List();
+					input.List_of_Batch_Details.clear();
+					for each  new in input.List_of_Item
+					{
+						fet = Item[ID == new.Item_Code];
+						if(fet.Advance_Inventory_Tracking == "Track Batches")
+						{
+							lis.add(fet.ID);
+						}
+					}
+					//lis
+					x = 0;
+					for each  rec in input.List_of_Item
+					{
+						x = x + 1;
+						itemDetails = Item[ID == rec.Item_Code];
+						if(itemDetails.Advance_Inventory_Tracking == "Track Batches")
+						{
+							rw = Old_Batch.List_of_Batch_Details();
+							rw.Item=itemDetails.ID;
+							rw.Sr_No=x;
+							rw.Required_Stock=rec.Required_Stock;
+							// 			rw.Related_Item=lis;
+							col = Collection();
+							col.insert(rw);
+							input.List_of_Batch_Details.insert(col);
+						}
+					}
+				}
+				else
+				{
+					hide Actual_Produce_Qty_Yield;
+					// 	hide List_of_Item.Total_Quantity;
+					hide List_of_Batch_Details;
+				}
+			)
+		}
+	}
+
+}
+
