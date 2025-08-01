@@ -56,4 +56,46 @@ Hide_Show_Fields12 as "Hide/Show Fields"
 	}
 
 }
+Hide_Show_Fields13 as "Hide/Show Fields"
+{
+	type =  form
+	form = Copy_of_Batch
+	record event = on add or edit
+
+	on load
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// disable List_of_Item.Quantity_Transferred;
+				// hide List_of_Item;
+				hide List_of_Batch_Details;
+				// hide List_of_Batch_Details.Total_Qty;
+				disable List_of_Batch_Details.Required_Stock;
+				hide Production_Item;
+				disable List_of_Item.Sr_No;
+				// hide List_of_Batch_Details.Related_Item;
+				disable List_of_Batch_Details.Sr_No;
+				disable List_of_Item.Required_Stock;
+				disable Batch_Status;
+				hide Actual_Produce_Qty_Yield;
+				disable List_of_Item.Quantity_Transferred;
+				hide Quantity_Received;
+				disable Quantity_Received;
+				disable List_of_Item.MPN_Master;
+				disable List_of_Item.Description;
+				// disable List_of_Item.Item_Code;
+				disable List_of_Item.Manufacturer;
+				disable List_of_Item.Location;
+				disable List_of_Item.Station;
+				hide List_of_Item.Quantity_Transferred;
+				disable List_of_Item.Total_Quantity;
+				hide List_of_Item.Batch;
+			)
+		}
+	}
+
+}
+
 
