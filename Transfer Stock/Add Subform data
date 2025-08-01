@@ -1,0 +1,116 @@
+Add_Subform_data1 as "Add Subform data"
+{
+	type =  form
+	form = Copy_of_Transfer_Stock
+	record event = on add
+
+	on user input of Quantity_to_be_Manufactured
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// ------ Add Line items from BOM ----------
+				if(Select_Transfer_Type == "For Assembly")
+				{
+					if(Select_BOM != null && input.Quantity_to_be_Manufactured != 0 || Select_BOM != null && input.Quantity_to_be_Manufactured != null)
+					{
+						fetch_records = Bill_of_Material[ID == input.Select_BOM];
+						input.Transfer_Details.clear();
+						// 	info fetch_records.List_Of_Items;
+						// Clear old entries if needed
+						for each  data in fetch_records.List_Of_Items
+						{
+							info data.Item_Name;
+							info data.Item_Name.IPC;
+							info data.Required_Quantity;
+							subform_row = Copy_of_Transfer_Stock.Transfer_Details();
+							subform_row.Item=data.Item_Name;
+							subform_row.Required_Quantity=ifnull(data.Required_Quantity,0) * ifnull(input.Quantity_to_be_Manufactured,0);
+							subform_row.Transfered_Quantity=ifnull(data.Required_Quantity,0) * ifnull(input.Quantity_to_be_Manufactured,0);
+							x = Collection();
+							x.insert(subform_row);
+							input.Transfer_Details.insert(x);
+						}
+						// 	// Step 2: Allocate from inventory using FIFO logic
+						itemWiseMap = Map();
+						for each  rec in input.Transfer_Details
+						{
+							requiredQty = rec.Required_Quantity;
+							itemCode = rec.Item;
+							batchDetails = Copy_of_Inventory[IPC == itemCode && Warehouse_Name == 229942000000604023] sort by Inward_Date;
+							batchList = List();
+							for each  bt in batchDetails
+							{
+								if(requiredQty <= 0)
+								{
+									break;
+								}
+								if(bt.Available_Quantity > 0)
+								{
+									allocQty = if(bt.Available_Quantity >= requiredQty,requiredQty,bt.Available_Quantity);
+									batchMap = Map();
+									batchMap.put("Batch No",bt.Batch_No);
+									batchMap.put("Available Qty",bt.Available_Quantity);
+									batchMap.put("Inward Date",bt.Inward_Date);
+									batchMap.put("Quantity Allocated",allocQty);
+									batchList.add(batchMap);
+									requiredQty = requiredQty - allocQty;
+								}
+							}
+							itemWiseMap.put(itemCode,batchList);
+						}
+						// Step 3: Store allocated batch data back into each subform row
+						for each  recc in input.Transfer_Details
+						{
+							itemCode = recc.Item;
+							batchList = itemWiseMap.get(itemCode);
+							lotMapList = List();
+							// For Lot_No_Backend (detailed format)
+							allocatedBatchText = "";
+							// For Allocated_Batches (formatted text)
+							firstBatch = true;
+							if(batchList != null)
+							{
+								for each  batch in batchList
+								{
+									// Detailed format for Lot_No_Backend
+									batchMap = Map();
+									batchNo = batch.get("Batch No");
+									quantity = batch.get("Quantity Allocated");
+									batchMap.put("Batch No",batchNo);
+									batchMap.put("Quantity Allocated",quantity);
+									batchMap.put("Inward Date",batch.get("Inward Date").toString("dd-MMM-yyyy"));
+									lotMapList.add(batchMap);
+									// Build formatted text for Allocated_Batches
+									if(!firstBatch)
+									{
+										allocatedBatchText = allocatedBatchText + "\n\n";
+										// Add spacing between batches
+									}
+									allocatedBatchText = allocatedBatchText + "Batch No: " + batchNo + "\nQuantity: " + quantity;
+									firstBatch = false;
+								}
+								if(recc.Item.Inventory_Account == "RM" || recc.Item.Inventory_Account == "SFG" && recc.Item.Advance_Inventory_Tracking != "Track Serial Number")
+								{
+									recc.Lot_No_Backend=lotMapList;
+									recc.Allocated_Batches=allocatedBatchText;
+								}
+							}
+						}
+					}
+					if(Select_BOM == null || Quantity_to_be_Manufactured == 0)
+					{
+						// 	input.Quantity_to_be_Manufactured = 0;
+						input.Transfer_Details.clear();
+					}
+					// disable Transfer_Details.Item;
+					disable Transfer_Details.Required_Quantity;
+					// disable Transfer_Details.Transfered_Quantity;
+				}
+			)
+		}
+	}
+
+}
+
