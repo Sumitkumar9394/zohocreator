@@ -1,0 +1,120 @@
+Update_Total_Qty as "Update Total Qty"
+{
+	type =  form
+	form = Item
+	record event = on edit
+
+	on load
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// Initialize total quantity to zero
+				qty = 0;
+				tot = 0;
+				// Initialize 'tot' to zero as well
+				// Loop through the alternate items and calculate their total quantity
+				for each  rec in input.Alternate_Item
+				{
+					invrec = Inventory[IPC == rec.ID];
+					for each  r in invrec
+					{
+						// Check if the warehouse matches
+						if(r.Warehouse_Name == 229942000000019005)
+						{
+							qty = qty + ifnull(r.Available_Quantity,0);
+						}
+					}
+				}
+				// Fetch the inventory details for the main item (input.ID)
+				invitm = Inventory[IPC == input.ID];
+				// Check if the main item's warehouse matches and sum the quantity
+				for each  r in invitm
+				{
+					if(r.Warehouse_Name == 229942000000019005)
+					{
+						tot = qty + ifnull(r.Available_Quantity,0);
+					}
+				}
+				// Assign the total quantity including the alternate items to the input field
+				input.Total_Quantity_Including_Alternate_Item = tot;
+				if(input.Item_Type == "Direct Item")
+				{
+					// Goods handling
+					if(input.Type_field == "Goods")
+					{
+						if(input.Inventory_Account == "AFG")
+						{
+							show Product_Name;
+							show IPC;
+							show Description;
+							show Unit;
+						}
+						else if(input.Inventory_Account == "RM")
+						{
+							show HSN_Code;
+							show Unit;
+							show Currency;
+							show MPN_Master;
+							show Vendor;
+							show Alternate_Item;
+							show MPN_Subform;
+							show Rate;
+							show Rate_Last_Purchase_Price;
+							show IPC;
+						}
+						else if(input.Inventory_Account == "SFG")
+						{
+							show IPC;
+							show Description;
+							show Unit;
+							show Rate;
+							show Rate_Last_Purchase_Price;
+						}
+					}
+					// Services handling
+					else if(input.Type_field == "Services")
+					{
+						show SAC_Code;
+						show IPC;
+						show Description;
+						show Unit;
+						show Currency;
+						show Rate;
+						show Rate_Last_Purchase_Price;
+					}
+				}
+				// Check for "Indirect Item"
+				else if(input.Item_Type == "Indirect Item")
+				{
+					// Goods handling
+					if(input.Type_field == "Goods")
+					{
+						show IPC;
+						show Vendor;
+						show Unit;
+						show Currency;
+						show Rate;
+						show Rate_Last_Purchase_Price;
+						show Description;
+					}
+					// Services handling
+					else if(input.Type_field == "Services")
+					{
+						show IPC;
+						show Description;
+						show Unit;
+						show SAC_Code;
+						show Currency;
+						show Vendor;
+						show Rate;
+						show Rate_Last_Purchase_Price;
+					}
+				}
+			)
+		}
+	}
+
+}
+
