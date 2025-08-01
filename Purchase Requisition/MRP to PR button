@@ -1,0 +1,76 @@
+MRP_to_PR_button as "MRP to PR button"
+{
+	type =  form
+	form = PR
+	record event = on add
+
+	on load
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					hide PR_No;
+				input.Date_field = zoho.currentdate;
+				if(Forecast != null && MRP != null && Run_For != "")
+				{
+					mrpData = MRP[ID == input.MRP];
+					if(Run_For == "AFG")
+					{
+						for each  rec in mrpData.RM_Details
+						{
+							// Check if Shortages_for_Purchase is not null and is negative
+							if(rec.Shortages_for_Purchase != null && rec.Shortages_for_Purchase < 0)
+							{
+								row1 = PR.MRP_Details();
+								row1.IPC=rec.IPC;
+								itemdetails = Item[ID = rec.IPC];
+								// 				info itemdetails.MPN_Master;
+								row1.Vendors=ifnull(rec.IPC.MPN_Master.Vendor_Name,Null);
+								row1.LPP=ifnull(rec.IPC.Rate_Last_Purchase_Price,0);
+								row1.MPN_Master=itemdetails.MPN_Master;
+								// 				row1.MPN_Master1:ui.add(itemdetails.MPN_Master);
+								row1.Manufacturer1=rec.Manufacturer1;
+								row1.PR_Quantity=rec.Shortages_for_Purchase.abs();
+								x = Collection();
+								x.insert(row1);
+								input.MRP_Details.insert(x);
+							}
+						}
+					}
+					else
+					{
+						for each  rec1 in mrpData.SFG_RM_Details
+						{
+							// Check if Shortages_for_Purchase is not null and is negative
+							if(rec1.Shortages_for_Purchase != null && rec1.Shortages_for_Purchase < 0)
+							{
+								row1 = PR.MRP_Details();
+								row1.IPC=rec1.IPC;
+								row1.Vendors=ifnull(rec1.IPC.MPN_Master.Vendor_Name,Null);
+								row1.LPP=ifnull(rec1.IPC.Rate_Last_Purchase_Price,0);
+								row1.MPN_Master=rec1.MPN_Master;
+								row1.Manufacturer1=rec1.Manufacturer;
+								row1.PR_Quantity=rec1.Shortages_for_Purchase.abs();
+								x = Collection();
+								x.insert(row1);
+								input.MRP_Details.insert(x);
+							}
+						}
+					}
+				}
+				sr = 0;
+				ls = List();
+				for each  reccc in input.MRP_Details
+				{
+					sr = sr + 1;
+					reccc.Sr_No=sr;
+					ls.add(reccc.Sr_No);
+					input.MRP_Details.insert(ls);
+				}
+			)
+		}
+	}
+
+}
+
