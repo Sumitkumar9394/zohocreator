@@ -1,0 +1,29 @@
+Update_MPN_details as "Update MPN details"
+{
+	type =  form
+	form = Item
+	record event = on add or edit
+
+	on user input of MPN_Subform.MPN
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					for each  rec in input.MPN_Subform
+				{
+					mpndata = MPN_Master[ID == rec.MPN];
+					// 	info "mpndata : "+mpndata;
+					row.Manufacturer=mpndata.Manufacturer_Name;
+					row.MOQ=ifnull(mpndata.MOQ,0);
+					row.SPQ=ifnull(mpndata.SPQ,0);
+					row.Vendor_Name=mpndata.Vendor_Name;
+					row.Rate=mpndata.Rate;
+					row.Currency=mpndata.Currency;
+				}
+			)
+		}
+	}
+
+}
+
