@@ -1,0 +1,41 @@
+Update_Qty_in_Inventory_a1 as "Update Qty in Inventory and Item"
+{
+	type =  form
+	form = Copy_of_Batch
+	record event = on edit
+
+	on success
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					//---------------------------------------------------------------------------------------------------------------------
+				if(input.Batch_Status == "Completed")
+				{
+					// 
+					bomDetails = Bill_of_Material[ID == input.Select_BOM];
+					for each  rec1 in input.List_of_Batch_Details
+					{
+						inventoryDetails1 = Inventory[ID == rec1.Inventory];
+						//info "Invetory Data : "+inventoryDetails1 ;
+						if(!inventoryDetails1.contains("No Matching"))
+						{
+							// 			inventoryDetails1.Available_Quantity=ifnull(inventoryDetails1.Available_Quantity,0) - ifnull(rec1.Total_Qty,0);
+							inventoryDetails1.Available_Quantity=ifnull(inventoryDetails1.Available_Quantity,0);
+						}
+					}
+					rec = insert into Inventory
+					[
+						Added_User=zoho.loginuser
+						Batch_No=input.Batch_No
+						Available_Quantity=input.Actual_Produce_Qty_Yield
+					];
+				}
+				openUrl("#Report:All_Batches","same window");
+			)
+		}
+	}
+
+}
+
