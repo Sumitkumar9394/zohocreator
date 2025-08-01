@@ -1,0 +1,112 @@
+AllocatedQuantity1 as "AllocatedQuantity"
+{
+	type =  form
+	form = Copy_of_Transfer_Stock
+	record event = on add
+
+	on user input of Transfer_Details.Allocated_Quantity
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					if(row.Scan_Batch != null && row.Allocated_Quantity != null)
+				{
+					scanBatch = row.Scan_Batch;
+					allocatedQty = row.Allocated_Quantity;
+					// New quantity to add
+					maxAllowedQty = 0;
+					// Will store the maximum allowed quantity for this batch
+					// 1. Find ALL matching batches in Lot_No_Backend and sum their quantities
+					if(row.Lot_No_Backend != null && !row.Lot_No_Backend.isEmpty())
+					{
+						for each  backedLot in row.Lot_No_Backend.toList()
+						{
+							if(backedLot.get("Batch No") == scanBatch)
+							{
+								maxAllowedQty = maxAllowedQty + ifnull(backedLot.get("Quantity Allocated").toDecimal(),0);
+							}
+						}
+					}
+					// If batch not found in backed data or total quantity is zero, don't proceed
+					if(maxAllowedQty == 0)
+					{
+						info "Batch " + scanBatch + " not found in allocated batches or has zero quantity";
+						row.Scan_Batch="";
+						row.Allocated_Quantity=null;
+						return;
+					}
+					lotList = List();
+					// To hold updated subform rows
+					if(row.Lot_No != null && !row.Lot_No.isEmpty())
+					{
+						lotList = row.Lot_No.toList();
+					}
+					// 2. Calculate current quantity for this batch (if already exists)
+					currentQty = 0;
+					batchFound = false;
+					for each  lot in lotList
+					{
+						if(lot.get("Batch No") == scanBatch)
+						{
+							currentQty = ifnull(lot.get("Quantity").toDecimal(),0);
+							batchFound = true;
+							break;
+						}
+					}
+					// 3. Check if adding new quantity would exceed total allowed quantity
+					newTotalQty = currentQty + allocatedQty;
+					if(newTotalQty > maxAllowedQty)
+					{
+						remainingQty = maxAllowedQty - currentQty;
+						if(remainingQty > 0)
+						{
+							alert "Quantity exceeds allocation! You can only add " + remainingQty + " more for batch " + scanBatch;
+						}
+						else
+						{
+							alert "Batch " + scanBatch + " already has full allocated quantity (" + maxAllowedQty + ")";
+						}
+						row.Allocated_Quantity=null;
+						return;
+					}
+					// 4. Update or add the batch
+					if(batchFound)
+					{
+						for each  lot in lotList
+						{
+							if(lot.get("Batch No") == scanBatch)
+							{
+								lot.put("Quantity",newTotalQty);
+								info "Updated batch " + scanBatch + ". Added " + allocatedQty + " to existing " + currentQty + " = " + newTotalQty;
+								break;
+							}
+						}
+					}
+					else
+					{
+						newBatch = Map();
+						newBatch.put("Batch No",scanBatch);
+						newBatch.put("Quantity",allocatedQty);
+						lotList.add(newBatch);
+						// 		info "Added new batch " + scanBatch + " with quantity: " + allocatedQty;
+					}
+					// 5. Update subform
+					row.Lot_No=lotList;
+					// 6. Recalculate total transferred quantity
+					transferredQty = 0;
+					for each  lot in lotList
+					{
+						transferredQty = transferredQty + ifnull(lot.get("Quantity").toDecimal(),0);
+					}
+					row.Transfered_Quantity=transferredQty;
+					// 7. Clear fields for next scan
+					row.Scan_Batch="";
+					row.Allocated_Quantity=null;
+				}
+			)
+		}
+	}
+
+}
+
