@@ -1,0 +1,200 @@
+Disable_fields6 as "Disable fields"
+{
+	type =  form
+	form = Copy_of_Transfer_Stock
+	record event = on add or edit
+
+	on load
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					hide IMEIs;
+				if(input.Batch != Null || Select_BOM != null)
+				{
+					disable Transfer_Details.Lot_No_Backend;
+					disable Transfer_Details.Lot_No;
+					hide Transfer_Details.Lot_No;
+					// 	disable Transfer_Details.Transfered_Quantity;
+					disable Transfer_Details.Required_Quantity;
+					// 	disable Transfer_Details.Item;
+				}
+				hide Transfer_Details.Lot_No;
+				// hide Transfer_Details.Lot_No_Backend;
+				disable Transfer_Details.Allocated_Batches;
+				disable Transfer_No;
+				// disable Transfer_Details.Transfered_Quantity;
+				if(input.Material_Request != null)
+				{
+					disable Select_Transfer_Type;
+					disable Material_Request;
+					request = Material_Request[ID = input.Material_Request];
+					if(request.Department == "R&D")
+					{
+						info "inside R&D";
+						input.Select_Transfer_Type = "Warehouse";
+						input.From_Warehouse = 229942000000604023;
+						input.To_Warehouse = 229942000000604035;
+						for each  item in request.List_Of_Items
+						{
+							row = Copy_of_Transfer_Stock.Transfer_Details();
+							row.Item=item.Item;
+							info item.Item;
+							info item.Quantity;
+							row.Required_Quantity=item.Quantity;
+							input.Transfer_Details.insert(row);
+						}
+					}
+					else if(request.Department == "Rework")
+					{
+						input.Select_Transfer_Type = "Warehouse";
+						input.From_Warehouse = 229942000000604023;
+						input.To_Warehouse = 229942000000604031;
+						for each  item in request.List_Of_Items
+						{
+							row = Copy_of_Transfer_Stock.Transfer_Details();
+							row.Item=item.Item;
+							info item.Item;
+							info item.Quantity;
+							row.Required_Quantity=item.Quantity;
+							input.Transfer_Details.insert(row);
+						}
+					}
+					else if(request.Department == "Quality")
+					{
+						input.Select_Transfer_Type = "Warehouse";
+						input.From_Warehouse = 229942000000604023;
+						input.To_Warehouse = 229942000004035069;
+						for each  item in request.List_Of_Items
+						{
+							row = Copy_of_Transfer_Stock.Transfer_Details();
+							row.Item=item.Item;
+							info item.Item;
+							info item.Quantity;
+							row.Required_Quantity=item.Quantity;
+							input.Transfer_Details.insert(row);
+						}
+					}
+					else if(request.Department == "EMS")
+					{
+						input.Select_Transfer_Type = "Warehouse";
+						input.From_Warehouse = 229942000000604023;
+						input.To_Warehouse = 229942000004035073;
+						for each  item in request.List_Of_Items
+						{
+							row = Copy_of_Transfer_Stock.Transfer_Details();
+							row.Item=item.Item;
+							info item.Item;
+							info item.Quantity;
+							row.Required_Quantity=item.Quantity;
+							input.Transfer_Details.insert(row);
+						}
+					}
+					else if(request.Department == "Production" && request.Change_In_BOM == false)
+					{
+						input.Select_Transfer_Type = "For Assembly";
+						input.From_Warehouse = 229942000000604023;
+						input.To_Warehouse = 229942000000604027;
+						for each  item in request.List_Of_Items
+						{
+							row = Copy_of_Transfer_Stock.Transfer_Details();
+							row.Item=item.Item;
+							info item.Item;
+							info item.Quantity;
+							row.Required_Quantity=item.Quantity;
+							input.Transfer_Details.insert(row);
+						}
+					}
+					else if(request.Department == "Production" && request.Change_In_BOM == true)
+					{
+						disable Select_BOM;
+						show Select_BOM;
+						input.Select_Transfer_Type = "Revision In BOM";
+						input.From_Warehouse = 229942000000604023;
+						input.To_Warehouse = 229942000000604027;
+						input.Select_BOM = request.Bill_of_Material;
+						for each  item in request.List_Of_Items
+						{
+							row = Copy_of_Transfer_Stock.Transfer_Details();
+							row.Item=item.Item;
+							info item.Item;
+							info item.Quantity;
+							row.Required_Quantity=item.Quantity;
+							input.Transfer_Details.insert(row);
+						}
+					}
+					// 	// Step 2: Allocate from inventory using FIFO logic
+					itemWiseMap = Map();
+					for each  rec in input.Transfer_Details
+					{
+						requiredQty = rec.Required_Quantity;
+						itemCode = rec.Item;
+						batchDetails = Copy_of_Inventory[IPC == itemCode && Warehouse_Name == 229942000000604023] sort by Inward_Date;
+						batchList = List();
+						for each  bt in batchDetails
+						{
+							if(requiredQty <= 0)
+							{
+								break;
+							}
+							if(bt.Available_Quantity > 0)
+							{
+								allocQty = if(bt.Available_Quantity >= requiredQty,requiredQty,bt.Available_Quantity);
+								batchMap = Map();
+								batchMap.put("Batch No",bt.Batch_No);
+								batchMap.put("Available Qty",bt.Available_Quantity);
+								batchMap.put("Inward Date",bt.Inward_Date);
+								batchMap.put("Quantity Allocated",allocQty);
+								batchList.add(batchMap);
+								requiredQty = requiredQty - allocQty;
+							}
+						}
+						itemWiseMap.put(itemCode,batchList);
+					}
+					// Step 3: Store allocated batch data back into each subform row
+					for each  recc in input.Transfer_Details
+					{
+						itemCode = recc.Item;
+						batchList = itemWiseMap.get(itemCode);
+						lotMapList = List();
+						// For Lot_No_Backend (detailed format)
+						allocatedBatchText = "";
+						// For Allocated_Batches (formatted text)
+						firstBatch = true;
+						if(batchList != null)
+						{
+							for each  batch in batchList
+							{
+								// Detailed format for Lot_No_Backend
+								batchMap = Map();
+								batchNo = batch.get("Batch No");
+								quantity = batch.get("Quantity Allocated");
+								batchMap.put("Batch No",batchNo);
+								batchMap.put("Quantity Allocated",quantity);
+								batchMap.put("Inward Date",batch.get("Inward Date").toString("dd-MMM-yyyy"));
+								lotMapList.add(batchMap);
+								// Build formatted text for Allocated_Batches
+								if(!firstBatch)
+								{
+									allocatedBatchText = allocatedBatchText + "\n\n";
+									// Add spacing between batches
+								}
+								allocatedBatchText = allocatedBatchText + "Batch No: " + batchNo + "\nQuantity: " + quantity;
+								firstBatch = false;
+							}
+							recc.Lot_No_Backend=lotMapList;
+							recc.Allocated_Batches=allocatedBatchText;
+						}
+					}
+				}
+				else
+				{
+					hide Material_Request;
+				}
+			)
+		}
+	}
+
+}
+
