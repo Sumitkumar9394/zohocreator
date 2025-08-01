@@ -1,0 +1,117 @@
+Create_IPC_formula5 as "Create IPC formula"
+{
+	type =  form
+	form = Item
+	record event = on add
+
+	on user input of Revision
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// if(input.Inventory_Account == "SFG" || input.Inventory_Account == "AFG")
+				// {
+				//     ipcFormulaBase = "";
+				//     errors = "";
+				//     // Validate required fields and add errors
+				//     if(input.Assembly_Type1 == null)
+				//     {
+				//         errors = errors + "Assembly Type is required.\n";
+				//     }
+				//     if(input.SIM_Type1 == null)
+				//     {
+				//         errors = errors + "SIM Type is required.\n";
+				//     }
+				//     if(input.Module_Name1 == null)
+				//     {
+				//         errors = errors + "Module Name is required.\n";
+				//     }
+				//     if(input.SIM_Provider1 == null)
+				//     {
+				//         errors = errors + "SIM Provider is required.\n";
+				//     }
+				//     if(input.Region1 == null)
+				//     {
+				//         errors = errors + "Region is required.\n";
+				//     }
+				//     if(input.PCBA_Type == "" && input.Inventory_Account == "SFG")
+				//     {
+				//         errors = errors + "PCBA Type is required.\n";
+				//     }
+				//     if(errors != "")
+				//     {
+				//         alert errors;
+				//     }
+				// Handle default values for missing fields
+				assemblyType = if(input.Assembly_Type1 != null,input.Assembly_Type1.Assembly_Type,"-");
+				simType = if(input.SIM_Type1 != null,input.SIM_Type1.SIM_Type,"-");
+				moduleName = if(input.Module_Name1 != null,input.Module_Name1.Model_Name,"-");
+				simProvider = if(input.SIM_Provider1 != null,input.SIM_Provider1.SIM_Provider,"-");
+				region = if(input.Region1 != null,input.Region1.Region_Code,"-");
+				pcbaType = if(input.PCBA_Type != "" && input.Inventory_Account == "SFG",input.PCBA_Type,"-");
+				// Construct IPC formula base
+				if(input.Inventory_Account == "AFG")
+				{
+					ipcFormulaBase = "INT" + input.Inventory_Account + "-" + assemblyType + "-" + simType + simProvider + moduleName + "-" + region + input.Revision;
+				}
+				else if(input.Inventory_Account == "SFG")
+				{
+					ipcFormulaBase = "INT" + input.Inventory_Account + "-" + assemblyType + "-" + pcbaType + "-" + simType + simProvider + moduleName + "-" + region + input.Revision;
+				}
+				// Fetch existing IPCs and generate new IPC
+				getData = Item[IPC.contains(ipcFormulaBase)];
+				newIPC = "";
+				if(getData.count() > 0)
+				{
+					for each  record in getData
+					{
+						lastIPC = record.IPC;
+					}
+					// Extract the numeric part and the prefix
+					lastNumberString = lastIPC.right(2);
+					prefix = lastIPC.subString(lastIPC.length() - 3,lastIPC.length() - 3);
+					lastNumber = lastNumberString.toNumber();
+					if(lastNumber < 99)
+					{
+						newNumber = lastNumber + 1;
+						formattedNewNumber = if(newNumber < 10,"0" + newNumber.toString(),newNumber.toString());
+						newIPC = ipcFormulaBase + prefix + formattedNewNumber;
+					}
+					else
+					{
+						// Increment prefix character sequence
+						firstChar = prefix.left(1);
+						secondChar = prefix.right(1);
+						// Increment the second character
+						if(secondChar != "Z")
+						{
+							secondChar = secondChar.toList().get(0) + 1;
+							info "secondChar : " + secondChar;
+							//                 secondChar = char(secondChar);
+						}
+						else
+						{
+							// If second character is Z, reset to A and increment the first character
+							secondChar = "A";
+							firstChar = firstChar.toList().get(0) + 1;
+							info "firstChar : " + firstChar;
+							//                 firstChar = char(firstChar);
+						}
+						newPrefix = firstChar + secondChar;
+						info "newPrefix : " + newPrefix;
+						newIPC = ipcFormulaBase + newPrefix + "01";
+					}
+				}
+				else
+				{
+					newIPC = ipcFormulaBase + "00";
+				}
+				input.IPC = newIPC;
+				// }
+			)
+		}
+	}
+
+}
+
