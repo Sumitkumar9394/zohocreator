@@ -1,0 +1,45 @@
+Fetch_Details_for_MNP_and as "Fetch Details for MNP and Lowest price"
+{
+	type =  form
+	form = PR
+	record event = on add or edit
+		status = inactive
+
+	on user input of MRP_Details.Fetch_Details
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					itemdetails = Item[ID = row.IPC];
+				mpndetails = itemdetails.MPN_Subform;
+				// 	info "subform : "+ mpndetails;
+				minprice = mpndetails.Rate.get(0);
+				mpn = mpndetails.MPN + "";
+				manufact = mpndetails.Manufacturer + "";
+				vend = mpndetails.Vendor_Name + "";
+				// 	info mpn ;
+				for each  rec in mpndetails
+				{
+					if(minprice > rec.Rate)
+					{
+						minprice = rec.Rate;
+						mpn = rec.MPN;
+						manufact = rec.Manufacturer;
+						vend = rec.Vendor_Name;
+					}
+				}
+				// 	info minprice ;
+				// 	info mpn ;
+				row.MPN_Master1=mpn;
+				row.Manufacturer1=manufact;
+				row.Vendor_Name=vend;
+				row.LPP=minprice;
+				row.MPN_Master1:ui.add(row.MPN_Master);
+				// info row.MPN_Master ;
+			)
+		}
+	}
+
+}
+
