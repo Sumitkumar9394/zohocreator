@@ -1,0 +1,11 @@
+int currencyApi()
+{
+	// 	currency_code = input.Currency_Dropdown; 
+	api_url = "https://api.exchangerate-api.com/v4/latest/USD";
+	response = getUrl(api_url);
+	info response;
+	exchange_rates = response.get("rates").get("INR");
+	info exchange_rates;
+	// input.Exchange_Rate_Field = selected_rate; // populate your exchange rate field
+	return exchange_rates;
+}
