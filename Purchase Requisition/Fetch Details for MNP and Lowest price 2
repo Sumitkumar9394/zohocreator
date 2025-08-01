@@ -1,0 +1,101 @@
+Fetch_Details_for_MNP_and1 as "Fetch Details for MNP and Lowest price"
+{
+	type =  form
+	form = PR
+	record event = on add or edit
+
+	on user input of Fetch_MPN_Details
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// ------------ Open PO data ------------
+				openPOData = Open_PO[Status == "Open"];
+				info openPOData;
+				for each  sub in input.MRP_Details
+				{
+					itemdetails = Item[ID = sub.IPC];
+					mpndetails = itemdetails.MPN_Subform;
+					// 	info "subform : "+ mpndetails;
+					// --------- Lowest Price MPN -----------
+					if(mpndetails.count() > 0)
+					{
+						minprice = mpndetails.Rate_INR.get(0);
+						minp = mpndetails.Rate.get(0);
+						mpn = mpndetails.MPN + "";
+						manufact = mpndetails.Manufacturer + "";
+						vend = mpndetails.Vendor_Name + "";
+						cu = mpndetails.Currency.get(0);
+						// 	info mpn ;
+						for each  rec in mpndetails
+						{
+							// 			info rec ;
+							if(minprice > rec.Rate_INR)
+							{
+								minprice = rec.Rate_INR;
+								minp = rec.Rate;
+								mpn = rec.MPN;
+								manufact = rec.Manufacturer;
+								vend = rec.Vendor_Name;
+								cu = rec.Currency;
+								info cu;
+							}
+						}
+						info "cu : " + cu;
+						// 	info minprice ;
+						// 	info mpn ;
+						sub.MPN_Master1=mpn;
+						sub.Currency=cu;
+						sub.Manufacturer1=manufact;
+						sub.Vendor_Name=vend;
+						sub.LPP=minp;
+						sub.MPN_Master1:ui.add(sub.MPN_Master);
+						// info row.MPN_Master ;	
+					}
+					//
+					// ------------ Open PO ---------
+					// 	info openPOData ;
+					oplist = list();
+					totatlopQty = 0;
+					for each  openpo in openPOData
+					{
+						for each  op in openpo.Item_Details
+						{
+							if(op.IPC == sub.IPC)
+							{
+								oplist.add(openpo);
+								totatlopQty = totatlopQty + op.Quantity;
+							}
+						}
+					}
+					sub.Open_PO=oplist;
+					sub.Open_PO_Quantity=totatlopQty;
+					prqty = sub.PR_Quantity - totatlopQty;
+					if(prqty <= 0)
+					{
+						//Pull_Qty
+						sub.Pull_Qty=sub.PR_Quantity;
+						sub.PO_Qty=0;
+						sub.PO_Pull="Pull";
+					}
+					else if(totatlopQty == 0)
+					{
+						sub.PO_Qty=prqty;
+						sub.Pull_Qty=0;
+						sub.PO_Pull="PO";
+					}
+					else
+					{
+						//sub.PO_Qty
+						sub.PO_Qty=prqty;
+						sub.Pull_Qty=totatlopQty;
+						sub.PO_Pull="Both";
+					}
+				}
+			)
+		}
+	}
+
+}
+
