@@ -1,0 +1,75 @@
+Validation2 as "Validation"
+{
+	type =  form
+	form = Item
+	record event = on add
+
+	on validate
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// Define a list to collect the names of missing fields
+				missing_fields = List();
+				if(Inventory_Account == "SFG" || Inventory_Account == "AFG")
+				{
+					// Check each required field and add its name to the list if it's empty
+					if(IPC == null)
+					{
+						missing_fields.add("IPC");
+					}
+					if((Inventory_Account == "SFG" && Type_of_SFG == "Main PCBA") || Inventory_Account == "AFG")
+					{
+						if(Item_Name == null)
+						{
+							missing_fields.add("Item Name");
+						}
+						if(SIM_Type1 == null)
+						{
+							missing_fields.add("SIM Type");
+						}
+						if(SIM_Provider1 == null)
+						{
+							missing_fields.add("SIM Provider");
+						}
+						if(Assembly_Type1 == null)
+						{
+							missing_fields.add("Assembly Type");
+						}
+						if(Region1 == null)
+						{
+							missing_fields.add("Region");
+						}
+						if(Module_Name1 == null)
+						{
+							missing_fields.add("Module Name");
+						}
+					}
+					// If there are any missing fields, create a formatted alert message
+					if(missing_fields.size() > 0)
+					{
+						formatted_message = "For SFG or AFG inventory accounts, please enter the following required fields:\n";
+						for each  field in missing_fields
+						{
+							formatted_message = formatted_message + field + "\n";
+						}
+						alert formatted_message;
+						cancel submit;
+					}
+				}
+				else if(Inventory_Account == "RM")
+				{
+					// Check if IPC is missing for RM inventory account
+					if(IPC == null)
+					{
+						alert "For RM inventory account, please enter the IPC field.";
+						cancel submit;
+					}
+				}
+			)
+		}
+	}
+
+}
+
