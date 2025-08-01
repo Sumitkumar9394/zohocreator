@@ -1,0 +1,41 @@
+Scan_and_check1 as "Scan and check"
+{
+	type =  form
+	form = Copy_of_Transfer_Stock
+	record event = on add
+
+	on user input of Transfer_Details.Scan_Batch
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					scanBatch = row.Scan_Batch;
+				found = false;
+				if(row.Lot_No_Backend != null && !row.Lot_No_Backend.isEmpty())
+				{
+					for each  rec in row.Lot_No_Backend.toList()
+					{
+						if(rec.get("Batch No") == scanBatch)
+						{
+							found = true;
+							break;
+						}
+					}
+					if(found)
+					{
+						// 		info "✅ Batch validation successful: " + scanBatch;
+					}
+					else
+					{
+						alert "❌ Invalid Batch: " + scanBatch;
+						row.Scan_Batch="";
+						// Clear invalid input
+					}
+				}
+			)
+		}
+	}
+
+}
+
