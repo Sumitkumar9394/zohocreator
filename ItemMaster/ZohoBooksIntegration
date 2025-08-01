@@ -1,0 +1,57 @@
+UpdateItemRecordBooks as "UpdateItemRecordBooks"
+{
+	type =  form
+	form = Item
+	record event = on edit
+
+	on success
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					if(input.Updated_From_Creator == true)
+				{
+					mp = Map();
+					// 	mp.put("name",input.IPC);
+					// 	mp.put("sku",input.IPC);
+					mp.put("manufacturer",ifnull(input.Vendor.Manufacturer_Name1,""));
+					// 	mp.put("hsn_or_sac",ifnull(input.HSN_Code,""));
+					mp.put("unit",ifnull(input.Unit,""));
+					mp.put("description",ifnull(input.Description,""));
+					mp.put("purchase_description",ifnull(input.Description,""));
+					mp.put("rate",ifnull(input.Rate,""));
+					// 	mp.put("item_type","sales_and_purchases");
+					mp.put("can_be_purchased","true");
+					mp.put("purchase_account_id","1916683000000000567");
+					mp.put("purchase_account_name","Cost of Goods Sold");
+					mp.put("purchase_rate",ifnull(input.Rate_Last_Purchase_Price,0));
+					// 	mp.put("product_type",ifnull(input.Type_field.toLowercase(),""));
+					MPN_Data = MPN_Master[ID in input.MPN_Master].MPN.getAll();
+					customList = List();
+					customMp = Map();
+					customMp.put("customfield_id",1916683000000622013);
+					customMp.put("value",input.IPC);
+					customList.add({"customfield_id":"1916683000007028321","value":MPN_Data.toString()});
+					customList.add(customMp);
+					mp.put("custom_fields",customList);
+					// info mp;
+					if(input.Books_ID != "")
+					{
+						updateRec = zoho.books.updateRecord("items","60030703452",input.Books_ID,mp,"booksconn");
+						info "updateRec : " + updateRec;
+					}
+					else
+					{
+						// 				createRec = zoho.books.createRecord("items","60030703452",mp,"booksconn");
+						// 				info "createRec : " + createRec;
+						// 				input.Books_ID = createRec.get("item").get("item_id");
+					}
+					input.Updated_From_Creator = false;
+				}
+			)
+		}
+	}
+
+}
+
