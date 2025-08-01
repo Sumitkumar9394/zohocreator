@@ -1,0 +1,137 @@
+Hide_and_Show_Product_nam as "Hide and Show Product name"
+{
+	type =  form
+	form = Item
+	record event = on add or edit
+
+	on user input of Inventory_Account
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// Hide all fields initially if Inventory_Account is empty or null
+				if(input.Inventory_Account == "" || input.Inventory_Account == null)
+				{
+					hide Product_Name;
+					hide IPC;
+					hide Type_of_SFG;
+					hide Description;
+					hide Unit;
+					hide HSN_Code;
+					hide Currency;
+					hide MPN_Master;
+					hide Vendor;
+					hide Alternate_Item;
+					hide MPN_Subform;
+					hide SAC_Code;
+					hide Rate;
+					hide Rate_Last_Purchase_Price;
+					hide Average_Rate;
+					hide PCBA_Type;
+					return;
+				}
+				// Check for "Direct Item" first
+				if(input.Item_Type == "Direct Item")
+				{
+					// Goods handling
+					if(input.Type_field == "Goods")
+					{
+						if(input.Inventory_Account == "AFG")
+						{
+							disable IPC;
+							show Product_Name;
+							show IPC;
+							show Description;
+							show Unit;
+							hide PCBA_Type;
+							show Assembly_Type1;
+							show SIM_Type1;
+							show SIM_Provider1;
+							show Module_Name1;
+							show Region1;
+							show Revision;
+							hide Type_of_SFG;
+						}
+						else if(input.Inventory_Account == "RM")
+						{
+							hide Type_of_SFG;
+							enable IPC;
+							show HSN_Code;
+							show Unit;
+							show Currency;
+							show MPN_Master;
+							show Vendor;
+							show Alternate_Item;
+							show MPN_Subform;
+							show Rate;
+							show IPC;
+							show Description;
+							hide PCBA_Type;
+							hide Assembly_Type1;
+							hide SIM_Type1;
+							hide SIM_Provider1;
+							hide Module_Name1;
+							hide Region1;
+							hide Revision;
+						}
+						else if(input.Inventory_Account == "SFG")
+						{
+							show Type_of_SFG;
+							disable IPC;
+							show IPC;
+							show Description;
+							show Unit;
+							show Rate;
+							show PCBA_Type;
+							show Assembly_Type1;
+							show Alternate_Item;
+							show SIM_Type1;
+							show SIM_Provider1;
+							show Module_Name1;
+							show Region1;
+							show Revision;
+						}
+					}
+					// Services handling
+					else if(input.Type_field == "Services")
+					{
+						show SAC_Code;
+						show IPC;
+						show Description;
+						show Unit;
+						show Currency;
+						show Rate;
+					}
+				}
+				// Check for "Indirect Item"
+				else if(input.Item_Type == "Indirect Item")
+				{
+					// Goods handling
+					if(input.Type_field == "Goods")
+					{
+						show IPC;
+						show Vendor;
+						show Unit;
+						show Currency;
+						show Rate;
+						show Description;
+					}
+					// Services handling
+					else if(input.Type_field == "Services")
+					{
+						show IPC;
+						show Description;
+						show Unit;
+						show SAC_Code;
+						show Currency;
+						show Vendor;
+						show Rate;
+					}
+				}
+			)
+		}
+	}
+
+}
+
