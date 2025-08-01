@@ -1,0 +1,112 @@
+Mapp_dependency as "Mapp dependency"
+{
+	type =  form
+	form = Item
+	record event = on add or edit
+
+	on user input of Type_field
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// hide Advance_Inventory_Tracking;
+				hide Item_Code;
+				hide Tax_Preference;
+				hide Item_Name;
+				hide SAC_Code;
+				hide HSN_Code;
+				hide Books_ID;
+				hide Total_Quantity_Including_Alternate_Item;
+				hide Product_Name;
+				hide SKU_No;
+				hide IPC;
+				hide Description;
+				hide Unit;
+				hide Currency;
+				hide MPN_Master;
+				hide Vendor;
+				hide Alternate_Item;
+				hide MPN_Subform;
+				hide Rate;
+				hide Average_Rate;
+				if(Item_Type != Null)
+				{
+					if(Item_Type == "Direct Item")
+					{
+						lis = List();
+						lis2 = List();
+						show Type_field;
+						if(input.Type_field == "Goods")
+						{
+							hide HSN_Code;
+							hide SAC_Code;
+							show Inventory_Account;
+							lis.add("AFG");
+							lis.add("SFG");
+							lis.add("RM");
+							input.Inventory_Account:ui.add(lis);
+						}
+						if(input.Type_field == "Services")
+						{
+							hide SAC_Code;
+							hide HSN_Code;
+							show Inventory_Account;
+							lis2.add("EMS Assembly");
+							lis2.add("Cable Assembly");
+							input.Inventory_Account:ui.add(lis2);
+							hide Assembly_Type1;
+							hide SIM_Type1;
+							hide SIM_Provider1;
+							hide Module_Name1;
+							hide Region1;
+							hide Revision;
+						}
+					}
+					else
+					{
+						lis = List();
+						lis2 = List();
+						show Type_field;
+						if(input.Type_field == "Goods")
+						{
+							hide HSN_Code;
+							hide SAC_Code;
+							hide Inventory_Account;
+							show IPC;
+							show Vendor;
+							enable Vendor;
+							show Unit;
+							show Currency;
+							show Rate;
+							show Description;
+							lis.add("AFG");
+							lis.add("SFG");
+							lis.add("RM");
+							input.Inventory_Account:ui.add(lis);
+						}
+						if(input.Type_field == "Services")
+						{
+							hide SAC_Code;
+							hide HSN_Code;
+							hide Inventory_Account;
+							show IPC;
+							show Description;
+							show Unit;
+							show SAC_Code;
+							show Rate;
+							show Currency;
+							show Vendor;
+							enable Vendor;
+							lis2.add("EMS Assembly");
+							lis2.add("Cable Assembly");
+							input.Inventory_Account:ui.add(lis2);
+						}
+					}
+				}
+			)
+		}
+	}
+
+}
+
