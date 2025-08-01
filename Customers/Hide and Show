@@ -1,0 +1,54 @@
+Hide_and_Show_GSTIN as "Hide and Show GSTIN"
+{
+	type =  form
+	form = Customer
+	record event = on add or edit
+
+	on user input of GST_Treatment
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					hide GSTIN_UIN;
+				hide Business_Legal_Name;
+				if(GST_Treatment == "Business - Regular")
+				{
+					show GSTIN_UIN;
+					show Business_Legal_Name;
+				}
+				if(GST_Treatment == "Business - Composition")
+				{
+					show GSTIN_UIN;
+					show Business_Legal_Name;
+				}
+				if(GST_Treatment == "Business - Unregistered")
+				{
+				}
+				if(GST_Treatment == "Consumer")
+				{
+				}
+				if(GST_Treatment == "Overseas")
+				{
+					hide GSTIN_UIN;
+					hide Business_Legal_Name;
+					hide Place_Of_Supply;
+				}
+				if(GST_Treatment == "SEZ")
+				{
+					show GSTIN_UIN;
+					show Business_Legal_Name;
+					show Place_Of_Supply;
+				}
+				if(GST_Treatment == "Deemed Exports")
+				{
+					show GSTIN_UIN;
+					show Business_Legal_Name;
+					show Place_Of_Supply;
+				}
+			)
+		}
+	}
+
+}
+
