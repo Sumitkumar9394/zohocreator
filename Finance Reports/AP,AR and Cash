@@ -1,0 +1,117 @@
+string QuickbooksIntegration()
+{
+	firstDayOfMonth = zoho.currentdate.toStartOfMonth();
+	lastDayOfMonth = zoho.currentdate.eomonth(0);
+	startDateString = firstDayOfMonth.toString("yyyy-MM-dd");
+	endDateString = lastDayOfMonth.toString("yyyy-MM-dd");
+	response = invokeurl
+	[
+		url :"https://quickbooks.api.intuit.com/v3/company/9130356245206556/reports/BalanceSheet?start_date=" + startDateString + "&end_date=" + endDateString
+		type :GET
+		connection:"quickbooks_connection"
+	];
+	json = response.toMap();
+	totalBankAccounts = 0.0;
+	totalAccountsReceivable = 0.0;
+	totalAccountsPayable = 0.0;
+	rows = json.get("Rows").get("Row");
+	for each  assetEntry in rows
+	{
+		section = assetEntry.get("Rows").get("Row");
+		for each  subSection in section
+		{
+			if(subSection.get("group") == "CurrentAssets")
+			{
+				subSectionRows = subSection.get("Rows").get("Row");
+				for each  currentAsset in subSectionRows
+				{
+					groupName = currentAsset.get("group");
+					if(groupName == "BankAccounts")
+					{
+						totalBankAccounts = currentAsset.get("Summary").get("ColData").get(1).get("value").toDecimal();
+					}
+					else if(groupName == "AR")
+					{
+						totalAccountsReceivable = currentAsset.get("Summary").get("ColData").get(1).get("value").toDecimal();
+					}
+				}
+			}
+			else if(subSection.get("group") == "Liabilities")
+			{
+				liabilities = subSection.get("Rows").get("Row");
+				for each  liabilityGroup in liabilities
+				{
+					if(liabilityGroup.get("group") == "CurrentLiabilities")
+					{
+						currentLiabilitiesRows = liabilityGroup.get("Rows").get("Row");
+						for each  currentLiability in currentLiabilitiesRows
+						{
+							if(currentLiability.get("group") == "AP")
+							{
+								totalAccountsPayable = currentLiability.get("Summary").get("ColData").get(1).get("value").toDecimal();
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	// Accounts Receivable
+	ar = AR_AP_Bank_Balance[Start_Date == firstDayOfMonth && End_Date == lastDayOfMonth && Type_field == "Accounts Receivable"];
+	if(ar.count() > 0)
+	{
+		ar.Amount=totalAccountsReceivable;
+		ar.Country="USA";
+	}
+	else
+	{
+		insert into AR_AP_Bank_Balance
+		[
+			Start_Date=firstDayOfMonth
+			End_Date=lastDayOfMonth
+			Added_User=zoho.loginuser
+			Country="USA"
+			Type_field="Accounts Receivable"
+			Amount=totalAccountsReceivable
+		]
+	}
+	// Accounts Payable
+	ap = AR_AP_Bank_Balance[Start_Date == firstDayOfMonth && End_Date == lastDayOfMonth && Type_field == "Accounts Payable"];
+	if(ap.count() > 0)
+	{
+		ap.Amount=totalAccountsPayable;
+		ap.Country="USA";
+	}
+	else
+	{
+		insert into AR_AP_Bank_Balance
+		[
+			Start_Date=firstDayOfMonth
+			End_Date=lastDayOfMonth
+			Added_User=zoho.loginuser
+			Country="USA"
+			Type_field="Accounts Payable"
+			Amount=totalAccountsPayable
+		]
+	}
+	// Bank Accounts
+	ba = AR_AP_Bank_Balance[Start_Date == firstDayOfMonth && End_Date == lastDayOfMonth && Type_field == "Cash & Bank Accounts"];
+	if(ba.count() > 0)
+	{
+		ba.Amount=totalBankAccounts;
+		ba.Country="USA";
+	}
+	else
+	{
+		insert into AR_AP_Bank_Balance
+		[
+			Start_Date=firstDayOfMonth
+			End_Date=lastDayOfMonth
+			Added_User=zoho.loginuser
+			Country="USA"
+			Type_field="Cash & Bank Accounts"
+			Amount=totalBankAccounts
+		]
+	}
+	return "Monthly records checked and updated/created for AR, AP, and Bank.";
+}
