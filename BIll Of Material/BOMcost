@@ -1,21 +1,58 @@
-Calculate_BOM_Cost as "Calculate BOM Cost"
+Calculate_BOM_Cost1 as "Calculate BOM Cost"
 {
 	type =  form
 	form = Bill_of_Material
 	record event = on add or edit
 
-	on user input of List_Of_Items.Amount
+	on user input of Update_BOM_Cost
 	{
 		actions 
 		{
 			custom deluge script
 			(
-					// Sum = 0;
-				// for each  r in input.List_Of_Items
-				// {
-				// 	Sum = Sum + ifnull(r.Amount,0);
-				// }
-				input.BOM_Cost = input.BOM_Cost + row.Amount;
+					Sum = 0;
+				for each  r in input.List_Of_Items
+				{
+					//	
+					//
+					if(r.Item_Name.Inventory_Account == "SFG")
+					{
+						info "SFG..";
+						bom = Bill_of_Material[Manufacturing_Item_Name == r.Item_Name];
+						if(!bom.contains("No Matching"))
+						{
+							info "BOM Found.." + bom;
+							info "Item :  " + r.Item_Name.IPC;
+							info "=======";
+							t = bom.Total_Cost;
+							// 			info r.Item_Name.IPC ;
+							// 			info "t : "+t ;
+							r.Amount=ifnull(t,0);
+							// 			info "==========" ;
+						}
+						else
+						{
+							info "BOM NOT FOUND";
+							getInv = Inventory[IPC == r.Item_Name && Warehouse_Name.Warehouse_Name == "Main Location"] sort by Inward_Date range from 1 to 1;
+							t = ifnull(r.Required_Quantity,0) * ifnull(getInv.Rate,0);
+							info "Item  : " + r.Item_Name.IPC;
+							info "t : " + t;
+							r.Amount=t.round(4);
+						}
+					}
+					else
+					{
+						getInv = Inventory[IPC == r.Item_Name && Warehouse_Name.Warehouse_Name == "Main Location"] sort by Inward_Date range from 1 to 1;
+						t = ifnull(r.Required_Quantity,0) * ifnull(getInv.Rate,0);
+						r.Amount=t.round(5);
+					}
+					//
+					// 	info r.Amount ;
+					// 	getInv = Inventory[IPC == r.Item_Name && Warehouse_Name.Warehouse_Name == "Main Location"] sort by Inward_Date range from 1 to 1;
+					sumOfIPC = ifnull(r.Required_Quantity,0) * ifnull(r.Amount,0);
+					Sum = Sum + sumOfIPC;
+				}
+				input.BOM_Cost = Sum.round(4);
 			)
 		}
 	}
