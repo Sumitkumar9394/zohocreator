@@ -1,9 +1,8 @@
-Mark_Inventory_as_Sold1 as "Mark Inventory as Sold"
+Mark_Inventory_as_Sold as "Mark Inventory as Sold"
 {
 	type =  form
-	form = Copy_of_Invoiced_Inventory
+	form = Invoiced_Inventory
 	record event = on add or edit
-		status = inactive
 
 	on success
 	{
