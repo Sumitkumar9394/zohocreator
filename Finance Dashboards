@@ -1,0 +1,147 @@
+void Pull_Bank_Statements()
+{
+	end_date = zoho.currentdate.toString("yyyy-MM-dd");
+	start = zoho.currentdate.addDay(-31);
+	start_date = start.toString("yyyy-MM-dd");
+	// 	end_date = "2025-06-30";
+	// 	start_date = "2025-06-01";
+	responseList = List();
+	transactionIDList = List();
+	count = 0;
+	pagination = {1,2,3,4,5,6,7,8,9,10};
+	for each  page in pagination
+	{
+		count = count + 1;
+		// Construct URL
+		url = "https://www.zohoapis.in/books/v3/banktransactions?organization_id=60030703452&Status.All&page=" + count + "&per_page=200" + "&date_start=" + start_date + "&date_end=" + end_date;
+		// API call
+		response = invokeurl
+		[
+			url :url
+			type :GET
+			connection:"booksconn"
+		];
+		// Break the loop if there is no banktransactions key
+		if(response.get("banktransactions") == null)
+		{
+			break;
+		}
+		// Add transactions to the list
+		for each  txn in response.get("banktransactions")
+		{
+			responseList.add(txn);
+			transactionIDList.add(txn.get("transaction_id"));
+		}
+	}
+	// Initialize map for totals
+	transaction_totals = Map();
+	for each  txn in responseList
+	{
+		if(txn.get("account_name") == "056605003222 - ICICI Bank - Active Account" || txn.get("account_name") == "200003986 - DBS Bank" || txn.get("account_name") == "2511675210 - Kotak Mahindra Bank Ltd." || txn.get("account_name") == "Standard Chartered Bank" || txn.get("account_name") == "50200037765132 - HDFC Bank Ltd." || txn.get("account_name") == "50200042634149 - HDFC Bank Ltd. (Capital Account)")
+		{
+			getExisting = Bank_Statements[Transaction_ID == txn.get("transaction_id")];
+			// 			info "getExisting : "+getExisting;
+			// 			info "outside loop";
+			// 			info "Count : " + getExisting.count();
+			if(getExisting.count() == 0)
+			{
+				// 				info "inside loop";
+				insertRec = insert into Bank_Statements
+				[
+					Added_User=zoho.loginuser
+					Transaction_ID=txn.get("transaction_id")
+					Account_Name=txn.get("account_name")
+					Offset_Account_Name=txn.get("offset_account_name")
+					Status=txn.get("status")
+					Source=txn.get("source")
+					Payee=txn.get("payee")
+					Reference_Number=txn.get("reference_number")
+					imported_transaction_id=txn.get("imported_transaction_id")
+					Account_Type=txn.get("account_type")
+					Description=txn.get("description")
+					Debit_or_Credit=txn.get("debit_or_credit")
+					Transaction_Type=txn.get("transaction_type")
+					Amount=txn.get("amount")
+					Date_field=txn.get("date").toDate()
+					Account_ID=txn.get("account_id")
+					Offset_Account_Code=txn.get("offset_account_code")
+					Reconcile_Status=txn.get("reconcile_status")
+					Exclude_Description=txn.get("exclude_description")
+					Running_Balance=txn.get("running_balance")
+				];
+				//vendorpayment_refund
+				getRec = Bank_Statements[ID == insertRec];
+				if(txn.get("transaction_type") == "customer_payment" || txn.get("transaction_type") == "MAHINDRA AND MAHINDRA FINANCIAL SER" || txn.get("offset_account_name") == "Razorpay Transaction")
+				{
+					getRec.Grouping="Customer Collection";
+				}
+				else if(txn.get("transaction_type") == "other_income" || txn.get("transaction_type") == "vendorpayment_refund" || txn.get("offset_account_name") == "Interest Income")
+				{
+					getRec.Grouping="Other Credits";
+				}
+				else if(txn.get("transaction_type") == "creditnote_refund" || txn.get("transaction_type") == "payment_refund")
+				{
+					getRec.Grouping="Other Debits";
+				}
+				else if(txn.get("offset_account_name") == "TCS Payable" || txn.get("offset_account_name") == "TDS 195- NRI Outward Remittances" || txn.get("offset_account_name") == "ESI- Employee Contribution-Payable" || txn.get("offset_account_name") == "Provident Fund Employee Contribution-Payable" || txn.get("offset_account_name") == "GST Payable (FY 2024-25)" || txn.get("offset_account_name") == "TDS Payable" || txn.get("offset_account_name") == "PT - (Profession Tax)" || txn.get("offset_account_name") == "ROC Filling Fees" || txn.get("offset_account_name") == "Stamp Duty" || txn.get("offset_account_name") == "Currency Fluctuation-Gain" || txn.get("offset_account_name") == "ODI Compliance Charges" || txn.get("offset_account_name") == "TDS Receivable FY 2024-25" || txn.get("offset_account_name") == "TDS Receivable Bank FD" || txn.get("offset_account_name") == "TDS Receivable (E2E)" || txn.get("offset_account_name") == "Provision- Custom Duty" || txn.get("offset_account_name") == "Profession Tax - Company")
+				{
+					getRec.Grouping="Duties & taxes Paid";
+				}
+				else if(txn.get("offset_account_name") == "Salary Payable" || txn.get("offset_account_name") == "Provision - Internship Fees" || txn.get("offset_account_name") == "Salaries & Benefits" || txn.get("offset_account_name") == "TDS 192B - On Salary")
+				{
+					getRec.Grouping="Salary";
+				}
+				else if(txn.get("offset_account_name") == "Application_Compulsory Convertible Debentures_")
+				{
+					getRec.Grouping="Share Capital";
+				}
+				else if(txn.get("offset_account_name") == "ALTERIA CAPITAL FUND IIIA0088" && txn.get("transaction_type") == "expense")
+				{
+					getRec.Grouping="Alteria Repayment";
+				}
+				else if(txn.get("offset_account_name") == "Intangles Lab UK - Loan" || txn.get("offset_account_name") == "Intangles Lab Corporation - Loan" || txn.get("offset_account_name").contains("Loan"))
+				{
+					getRec.Grouping="Loan to Subsidiaries";
+				}
+				else if(txn.get("offset_account_name") == "Stride Ventures Debt Fund III" || txn.get("offset_account_name").contains("Stride"))
+				{
+					getRec.Grouping="Stride Repayment";
+				}
+				else if(txn.get("offset_account_name").contains("FD With HDFC Bank") || txn.get("transaction_type") == "deposit" || txn.get("offset_account_name").contains("Deposit") || txn.get("offset_account_name").contains("FD"))
+				{
+					getRec.Grouping="Deposits";
+				}
+				else if(txn.get("transaction_type") == "vendor_payment" || txn.get("offset_account_name").contains("Neil Unadkat") || txn.get("offset_account_name").contains("Procurement") || txn.get("offset_account_name") == "UNIDENTIFIED TRANSACTIONS" || txn.get("offset_account_name") == "Exchange Gain/Loss" || txn.get("offset_account_name") == "Bank Charges")
+				{
+					getRec.Grouping="Purchase & Opex";
+				}
+				else
+				{
+					getRec.Grouping="Travel and Advance";
+				}
+				if(getRec.Grouping != "Customer Collection")
+				{
+					if(getRec.Debit_or_Credit == "credit")
+					{
+						getRec.Amount=0 - getRec.Amount;
+					}
+				}
+			}
+			else
+			{
+				getExisting.Date_field=txn.get("date").toDate();
+			}
+		}
+	}
+	creatorData = Bank_Statements[Date_field >= start_date && Date_field <= end_date].Transaction_ID.getAll();
+	info "creatorData : " + creatorData.size();
+	info "transactionIDList : " + transactionIDList.size();
+	for each  creRec in creatorData
+	{
+		if(!transactionIDList.contains(creRec))
+		{
+			info "deleted : " + creRec;
+			delete from Bank_Statements[Transaction_ID == creRec];
+		}
+	}
+}
