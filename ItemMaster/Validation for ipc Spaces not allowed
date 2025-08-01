@@ -1,0 +1,29 @@
+Validation_for_ipc_Spaces as "Validation for ipc Spaces not allowed"
+{
+	type =  form
+	form = Item
+	record event = on add or edit
+
+	on user input of IPC
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					strg = input.IPC;
+				if(strg.contains(" "))
+				{
+					alert "White Spaces not allowed in IPC. Please remove.!";
+					input.IPC = null;
+				}
+				if(strg.contains("!") || strg.contains("@") || strg.contains("$") || strg.contains("%") || strg.contains("^") || strg.contains("&") || strg.contains("*") || strg.contains("(") || strg.contains(")") || strg.contains("_") || strg.contains("+") || strg.contains("=") || strg.contains("{") || strg.contains("}") || strg.contains("[") || strg.contains("]") || strg.contains("|") || strg.contains("\\") || strg.contains(":") || strg.contains(";") || strg.contains("\"") || strg.contains("'") || strg.contains("<") || strg.contains(">") || strg.contains(",") || strg.contains("?") || strg.contains("/") || strg.contains("~") || strg.contains("`"))
+				{
+					alert "Special characters detected!";
+					input.IPC = null;
+				}
+			)
+		}
+	}
+
+}
+
