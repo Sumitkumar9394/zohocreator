@@ -1,0 +1,20 @@
+Add_Additonal_Qty_In_PR_Q as "Add Additonal Qty In PR Qty"
+{
+	type =  form
+	form = MRP
+	record event = on add or edit
+
+	on user input of FG_Details.Additional_Quantity
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					row.PR_Quantity=ifnull(row.Available_Quantity,0) - (ifnull(row.Required_Quantity,0) + ifnull(row.Additional_Quantity,0));
+				row.Shortages_for_Purchase=ifnull(row.Available_Quantity,0) - (ifnull(row.Required_Quantity,0) + ifnull(row.Additional_Quantity,0));
+			)
+		}
+	}
+
+}
+
