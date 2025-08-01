@@ -1,0 +1,38 @@
+Create_PR_number as "Create PR number"
+{
+	type =  form
+	form = PR
+	record event = on add
+
+	on success
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					input.PR_No = "PR/" + input.Auto_Number;
+				getRec = MRP[ID == input.MRP];
+				checkRec = PR[MRP == input.MRP];
+				lis = List();
+				for each  rec in checkRec
+				{
+					if(rec.Run_For == "AFG")
+					{
+						lis.add("AFG PR Raised");
+					}
+					else if(rec.Run_For == "SFG")
+					{
+						lis.add("SFG PR Raised");
+					}
+				}
+				getRec.PR_Status=lis;
+				if(getRec.PR_Status.contains("SFG PR Raised") && getRec.PR_Status.contains("AFG PR Raised"))
+				{
+					getRec.Status="PR Raised";
+				}
+			)
+		}
+	}
+
+}
+
