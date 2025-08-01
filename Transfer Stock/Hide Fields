@@ -1,0 +1,117 @@
+Hide_Fields10 as "Hide Fields"
+{
+	type =  form
+	form = Copy_of_Transfer_Stock
+	record event = on add
+		status = inactive
+
+	on user input of Select_BOM
+	{
+		actions 
+		{
+			custom deluge script
+			(
+					// if(input.Select_BOM != null)
+				// {
+				// 	info "Not Null Lopp";
+				// 	show IMEIs;
+				// 	hide Copy_of_Batch;
+				// 	input.From_Warehouse = 229942000001944013;
+				// 	input.To_Warehouse = 229942000001944017;
+				// }
+				// if(input.Select_BOM == null)
+				// {
+				// 	info "NULL Loop";
+				// 	hide IMEIs;
+				// 	show Copy_of_Batch;
+				// 	// 	input.Quantity_to_be_Manufactured = 0;
+				// 	input.From_Warehouse = null;
+				// 	input.To_Warehouse = null;
+				// 	input.Transfer_Details.clear();
+				// }
+				// ------ Add Line items from BOM ----------
+				if(Select_BOM != null && input.Quantity_to_be_Manufactured != 0)
+				{
+					fetch_records = Bill_of_Material[ID == input.Select_BOM].List_Of_Items;
+					input.Transfer_Details.clear();
+					// Clear old entries if needed
+					for each  data in fetch_records
+					{
+						subform_row = Transfer_Stock.Transfer_Details();
+						subform_row.Item=data.Item_Name;
+						subform_row.Required_Quantity=data.Required_Quantity * ifnull(input.Quantity_to_be_Manufactured,0);
+						input.Transfer_Details.insert(subform_row);
+					}
+					// Step 2: Allocate from inventory using FIFO logic
+					itemWiseMap = Map();
+					for each  rec in input.Transfer_Details
+					{
+						requiredQty = rec.Required_Quantity;
+						itemCode = rec.Item;
+						batchDetails = Copy_of_Inventory[IPC == itemCode] sort by Inward_Date;
+						batchList = List();
+						for each  bt in batchDetails
+						{
+							if(requiredQty <= 0)
+							{
+								break;
+							}
+							if(bt.Available_Quantity > 0)
+							{
+								allocQty = if(bt.Available_Quantity >= requiredQty,requiredQty,bt.Available_Quantity);
+								batchMap = Map();
+								batchMap.put("Batch No",bt.Batch_No);
+								batchMap.put("Available Qty",bt.Available_Quantity);
+								batchMap.put("Inward Date",bt.Inward_Date);
+								batchMap.put("Quantity Allocated",allocQty);
+								batchList.add(batchMap);
+								requiredQty = requiredQty - allocQty;
+							}
+						}
+						itemWiseMap.put(itemCode,batchList);
+					}
+					// Step 3: Store allocated batch data back into each subform row
+					for each  recc in input.Transfer_Details
+					{
+						itemCode = recc.Item;
+						batchList = itemWiseMap.get(itemCode);
+						lotMapList = List();
+						// For Lot_No_Backend (detailed format)
+						allocatedBatchText = "";
+						// For Allocated_Batches (formatted text)
+						firstBatch = true;
+						if(batchList != null)
+						{
+							for each  batch in batchList
+							{
+								// Detailed format for Lot_No_Backend
+								batchMap = Map();
+								batchNo = batch.get("Batch No");
+								quantity = batch.get("Quantity Allocated");
+								batchMap.put("Batch No",batchNo);
+								batchMap.put("Quantity Allocated",quantity);
+								batchMap.put("Inward Date",batch.get("Inward Date").toString("dd-MMM-yyyy"));
+								lotMapList.add(batchMap);
+								// Build formatted text for Allocated_Batches
+								if(!firstBatch)
+								{
+									allocatedBatchText = allocatedBatchText + "\n\n";
+									// Add spacing between batches
+								}
+								allocatedBatchText = allocatedBatchText + "Batch No: " + batchNo + "\nQuantity: " + quantity;
+								firstBatch = false;
+							}
+							recc.Lot_No_Backend=lotMapList;
+							recc.Allocated_Batches=allocatedBatchText;
+						}
+					}
+				}
+				disable Transfer_Details.Item;
+				disable Transfer_Details.Required_Quantity;
+				disable Transfer_Details.Transfered_Quantity;
+			)
+		}
+	}
+
+}
+
