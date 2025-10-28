@@ -1,0 +1,257 @@
+void IndiaBalancesheetData()
+{
+	end_date = zoho.currentdate.eomonth(0).toString("yyyy-MM-dd");
+	//     info end_date;
+	url = "https://www.zohoapis.in/books/v3/reports/balancesheet" + "?organization_id=60030703452" + "&to_date=" + end_date + "&is_new_flow=true" + "&is_new_group_by=true" + "&response_option=1";
+	response = invokeurl
+	[
+		url :url
+		type :GET
+		connection:"zoho_books_connection"
+	];
+	// 		info response;
+	StartDate = zoho.currentdate.toStartOfMonth().toString("dd-MMM-yyyy");
+	EndDate = zoho.currentdate.eomonth(0).toString("dd-MMM-yyyy");
+	// 	StartDate = "01-Sep-2025";
+	// 	EndDate = "30-Sep-2025";
+	// Initialize variables
+	cash_total = 0;
+	bank_balance_total = 0;
+	fd_hdfc_total = 0;
+	accounts_receivable_total = 0;
+	accounts_payable_total = 0;
+	// New variables for additional accounts
+	fd_bank_guarantee_total = 0;
+	// Inventory related variables
+	inventory_total = 0;
+	finished_goods_total = 0;
+	semi_finished_goods_total = 0;
+	inventory_rm_total = 0;
+	inventory_fg_total = 0;
+	inventory_sfg_total = 0;
+	raw_material_total = 0;
+	// Advance related variables
+	advance_from_customers_total = 0;
+	advance_to_vendor_total = 0;
+	balance_sheet = response.get("balance_sheet");
+	// Loop over the main sections: "Assets" and "Liabilities & Equities"
+	for each  section in balance_sheet
+	{
+		// Assets section - look for Cash, Bank, FD with HDFC, Accounts Receivable
+		if(section.get("name") == "Assets")
+		{
+			assets_accounts = section.get("account_transactions");
+			for each  asset in assets_accounts
+			{
+				if(asset.get("name") == "Current Assets")
+				{
+					current_assets = asset.get("account_transactions");
+					for each  account in current_assets
+					{
+						if(account.get("name") == "Cash")
+						{
+							cash_total = account.get("total");
+						}
+						else if(account.get("name") == "Bank")
+						{
+							bank_balance_total = account.get("total");
+						}
+						else if(account.get("name") == "Other Current Assets")
+						{
+							other_assets = account.get("account_transactions");
+							for each  sub_account in other_assets
+							{
+								if(sub_account.get("name") == "FD With HDFC Bank")
+								{
+									fd_hdfc_total = sub_account.get("total");
+								}
+								// Calculate Total Fixed Deposits for Bank Guarantee
+								else if(sub_account.get("name").contains("FD For Bank Guarantee") || sub_account.get("name").contains("FD for Bank Guarantee"))
+								{
+									fd_bank_guarantee_total = fd_bank_guarantee_total + sub_account.get("total");
+									// 									info "sub_account.get(\"total\") : "+sub_account.get("total");
+								}
+								// Inventory accounts - ALL CHILD ACCOUNTS
+								else if(sub_account.get("name") == "Inventory")
+								{
+									inventory_total = sub_account.get("total");
+								}
+								else if(sub_account.get("name") == "Finished Good")
+								{
+									finished_goods_total = sub_account.get("total");
+								}
+								else if(sub_account.get("name") == "Semi Finished Goods (SFG)")
+								{
+									semi_finished_goods_total = sub_account.get("total");
+								}
+								else if(sub_account.get("name") == "Inventory - RM")
+								{
+									inventory_rm_total = sub_account.get("total");
+								}
+								else if(sub_account.get("name") == "Inventory - FG")
+								{
+									inventory_fg_total = sub_account.get("total");
+								}
+								else if(sub_account.get("name") == "Inventory - SFG")
+								{
+									inventory_sfg_total = sub_account.get("total");
+								}
+								else if(sub_account.get("name") == "Raw Material")
+								{
+									raw_material_total = sub_account.get("total");
+								}
+								else if(sub_account.get("name") == "Raw Materials")
+								{
+									// If you want to track this separately from "Raw Material"
+									raw_materials_total = sub_account.get("total");
+								}
+								// Advance to vendor (Asset - money given to vendors)
+								else if(sub_account.get("name") == "Advance to vendor")
+								{
+									advance_to_vendor_total = sub_account.get("total");
+								}
+							}
+						}
+						else if(account.containKey("account_transactions"))
+						{
+							// Search inside this account's transactions for Accounts Receivable
+							sub_accounts = account.get("account_transactions");
+							for each  sub_acc in sub_accounts
+							{
+								if(sub_acc.get("name") == "Accounts Receivable")
+								{
+									accounts_receivable_total = sub_acc.get("total");
+									break;
+								}
+							}
+						}
+						else if(account.get("name") == "Accounts Receivable")
+						{
+							// fallback if Accounts Receivable is directly here
+							accounts_receivable_total = account.get("total");
+						}
+					}
+				}
+			}
+		}
+		// Liabilities section - look for Accounts Payable under Current Liabilities
+		else if(section.get("name") == "Liabilities & Equities")
+		{
+			liabilities_accounts = section.get("account_transactions");
+			for each  liability in liabilities_accounts
+			{
+				if(liability.get("name") == "Liabilities")
+				{
+					sub_liabilities = liability.get("account_transactions");
+					for each  sub_liab in sub_liabilities
+					{
+						if(sub_liab.get("name") == "Current Liabilities")
+						{
+							current_liabilities = sub_liab.get("account_transactions");
+							for each  curr_liab in current_liabilities
+							{
+								if(curr_liab.get("name") == "Accounts Payable")
+								{
+									accounts_payable_total = curr_liab.get("total");
+								}
+								// Advance from customers (Liability - money received from customers)
+								else if(curr_liab.get("name") == "Advance from Customer")
+								{
+									advance_from_customers_total = curr_liab.get("total");
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	// 	total_inventory_sum = inventory_total + finished_goods_total + semi_finished_goods_total + raw_material_total + raw_materials_total;
+	allInventory = inventory_total + raw_materials_total;
+	newtotal_inventory_sum = allInventory + finished_goods_total + semi_finished_goods_total + raw_material_total;
+	info "newtotal_inventory_sum : " + newtotal_inventory_sum;
+	// 	info "inventory_total : "+inventory_total;
+	// 	info "finished_goods_total : "+finished_goods_total;
+	// 	info "semi_finished_goods_total : "+semi_finished_goods_total;
+	// 	info "raw_material_total : "+raw_material_total;
+	// 	info "raw_materials_total : "+raw_materials_total;
+	// 	info "total_inventory_sum : "+total_inventory_sum;
+	// Create individual records for each subgroup
+	all_subgroups = List();
+	// Cash & Cash Equivalent Subgroups
+	all_subgroups.add({"Grouping":"Cash & Cash Equivalent","Sub_Group":"Cash on Hand","Amount":cash_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Cash & Cash Equivalent","Sub_Group":"Cash at Bank","Amount":bank_balance_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Cash & Cash Equivalent","Sub_Group":"FD Regular","Amount":fd_hdfc_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Cash & Cash Equivalent","Sub_Group":"FD Bank Guarantee","Amount":fd_bank_guarantee_total.toDecimal()});
+	// Inventory Subgroups
+	all_subgroups.add({"Grouping":"Inventory","Sub_Group":"Inventory","Amount":inventory_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Inventory","Sub_Group":"Total Inventory","Amount":newtotal_inventory_sum.toDecimal()});
+	all_subgroups.add({"Grouping":"Inventory","Sub_Group":"Finished Goods","Amount":finished_goods_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Inventory","Sub_Group":"Semi Finished Goods SFG","Amount":semi_finished_goods_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Inventory","Sub_Group":"Inventory RM","Amount":inventory_rm_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Inventory","Sub_Group":"Inventory FG","Amount":inventory_fg_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Inventory","Sub_Group":"Inventory SFG","Amount":inventory_sfg_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Inventory","Sub_Group":"Raw Material","Amount":raw_material_total.toDecimal()});
+	// Trade Receivable Subgroups
+	all_subgroups.add({"Grouping":"Trade Receivable","Sub_Group":"Accounts Receivable","Amount":accounts_receivable_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Trade Receivable","Sub_Group":"Advance from Customers","Amount":advance_from_customers_total.toDecimal()});
+	// Trade Payable Subgroups
+	all_subgroups.add({"Grouping":"Trade Payable","Sub_Group":"Accounts Payable","Amount":accounts_payable_total.toDecimal()});
+	all_subgroups.add({"Grouping":"Trade Payable","Sub_Group":"Advance to Vendors","Amount":advance_to_vendor_total.toDecimal()});
+	// Process each subgroup
+	for each  subgroup_data in all_subgroups
+	{
+		grouping_value = subgroup_data.get("Grouping");
+		subgroup_value = subgroup_data.get("Sub_Group");
+		amount_value = subgroup_data.get("Amount");
+		// Search if a record exists with this StartDate, EndDate, Grouping AND Sub_Group
+		checkData = Balance_Sheet_Metrics[Start_Date == StartDate && End_Date == EndDate && Grouping == grouping_value && Sub_Group == subgroup_value];
+		if(checkData.count() > 0)
+		{
+			// 			info "Update existing record";
+			for each  existingRec in checkData
+			{
+				updateRec = Balance_Sheet_Metrics[ID == existingRec];
+				if(subgroup_value == "Advance to Vendors" || subgroup_value == "Advance from Customers")
+				{
+					amount_value = 0 - amount_value;
+				}
+				updateRec.Amount=amount_value;
+			}
+		}
+		else
+		{
+			if(subgroup_value == "Advance to Vendors" || subgroup_value == "Advance from Customers")
+			{
+				amount_value = 0 - amount_value;
+			}
+			// Insert new record
+			createRec = insert into Balance_Sheet_Metrics
+			[
+				Added_User=zoho.loginuser
+				Start_Date=StartDate
+				End_Date=EndDate
+				Grouping=grouping_value
+				Sub_Group=subgroup_value
+				Amount=amount_value
+			];
+		}
+	}
+	// Display all totals (optional - for debugging)
+	// info "Cash In Hand: " + cash_total.toDecimal();
+	// info "Cash at Bank: " + bank_balance_total.toDecimal();
+	// info "Accounts Receivable Total: " + accounts_receivable_total.toDecimal();
+	// info "Accounts Payable Total: " + accounts_payable_total.toDecimal();
+	// info "Total Fixed Deposits - Bank Guarantee: " + fd_bank_guarantee_total.toDecimal();
+	// info "FD - regular: " + fd_hdfc_total.toDecimal();
+	// info "Inventory Total: " + inventory_total.toDecimal();
+	// info "Finished Goods Total: " + finished_goods_total.toDecimal();
+	// info "Semi Finished Goods (SFG) Total: " + semi_finished_goods_total.toDecimal();
+	// info "Inventory - RM Total: " + inventory_rm_total.toDecimal();
+	// info "Inventory - FG Total: " + inventory_fg_total.toDecimal();
+	// info "Inventory - SFG Total: " + inventory_sfg_total.toDecimal();
+	// info "Raw Material Total: " + raw_material_total.toDecimal();
+	// info "Advance from Customers Total: " + advance_from_customers_total.toDecimal();
+	// info "Advance to Vendor Total: " + advance_to_vendor_total.toDecimal();
+	// info "Total Inventory Sum (All Components): " + total_inventory_sum.toDecimal();
+}
